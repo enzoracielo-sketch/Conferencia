@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SEVA Metrología - Simulador Final 3D (Con Puertas)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        :root { --guinda: #660033; --negro: #1a1a1a; --gris: #f4f6f9; --rojo: #e74c3c; --verde: #2ecc71; --amarillo: #f1c40f; --azul: #3498db; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--gris); margin: 0; padding: 15px; color: var(--negro); font-size: 14px;}
+        .dashboard { max-width: 1600px; margin: 0 auto; display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
+        .panel { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        h1, h2, h3, h4 { margin-top: 0; color: var(--guinda); margin-bottom: 10px;}
+        
+        .control-group { margin-bottom: 12px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.85rem; text-transform: uppercase; }
+        select, input[type="range"], input[type="number"], input[type="file"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; }
+        .btn { display: block; width: 100%; padding: 12px; margin-bottom: 10px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; color: white; transition: 0.3s; font-size: 0.9rem;}
+        .btn-start { background-color: var(--verde); } .btn-stop { background-color: var(--rojo); } .btn-export { background-color: var(--guinda); } .btn-blue { background-color: var(--azul); }
+        
+        .event-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .btn-event { padding: 10px; font-weight: bold; font-size: 0.75rem; border: 2px solid #ccc; background: #eee; cursor: pointer; border-radius: 5px; color: #333; }
+        .btn-event.active-power { background: var(--negro); color: var(--rojo); border-color: var(--rojo); }
+        .btn-event.active-door { background: var(--azul); color: white; border-color: #2980b9; }
+
+        /* Contenedor Animación Logística */
+        .visual-container { width: 100%; height: 180px; border: 4px solid var(--negro); border-radius: 8px; position: relative; overflow: hidden; margin-bottom: 15px; background: linear-gradient(#87CEEB, #e0f6ff);}
+        .vehicle { width: 180px; height: 100px; position: absolute; bottom: 15px; left: 10%; transition: left 0.5s; display: flex; align-items: flex-end; }
+        .van-cab { width: 40px; height: 60px; background: #e0e0e0; border-radius: 10px 20px 0 0; border: 2px solid #ccc; z-index: 2;}
+        .van-box { width: 140px; height: 85px; background: white; border: 3px solid #ccc; border-radius: 5px; position: relative; display: flex; align-items: center; justify-content: center; z-index: 2;}
+        .van-box::after { content: 'SEVA LOGÍSTICA'; font-weight: bold; color: var(--guinda); font-size: 11px; }
+        .van-wheel { width: 28px; height: 28px; background: #222; border-radius: 50%; position: absolute; bottom: -12px; border: 4px solid #ccc; z-index: 3;}
+        .wheel-1 { left: 15px; } .wheel-2 { right: 25px; }
+        
+        /* 4 Métricas Clave */
+        .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+        .metric-box { background: var(--negro); color: white; padding: 12px; border-radius: 8px; text-align: center; }
+        .metric-value { font-size: 1.3rem; font-weight: bold; color: #ffcccc; }
+        .metric-label { font-size: 0.7rem; text-transform: uppercase; margin-top: 5px; }
+        
+        /* Contenedor 3D */
+        .blueprint-container { width: 100%; display: flex; flex-direction: column; gap: 10px;}
+        #map3D { border: 4px solid #2c3e50; border-radius: 4px; background-color: #ecf0f1; width: 100%; height: 350px; position: relative;}
+        
+        .coord-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px;}
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background-color: var(--guinda); color: white; position: sticky; top:0;}
+        .chart-container { height: 250px; width: 100%; margin-top: 20px;}
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="panel">
+        <h2>Plataforma de Caracterización 3D y Cinética</h2>
+        
+        <div class="visual-container">
+            <div class="vehicle" id="vehicle">
+                <div class="van-cab"></div><div class="van-box"></div>
+                <div class="van-wheel wheel-1"></div><div class="van-wheel wheel-2"></div>
+            </div>
+        </div>
+
+        <div class="blueprint-container">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="margin: 0;">Mapeo Espacial 3D (Interactivo)</h4>
+                <span id="dimension-info" style="font-size: 0.8rem; font-weight: bold; color: #555;">Gira y acerca con el ratón para explorar los sensores.</span>
+            </div>
+            <div id="map3D"></div>
+            
+            <div style="height: 120px; overflow-y: auto;">
+                <table id="sensor-table">
+                    <thead><tr><th>ID</th><th>X (m)</th><th>Y [Altura] (m)</th><th>Z (m)</th><th>Nivel de Riesgo Físico</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="chart-container"><canvas id="tempChart"></canvas></div>
+    </div>
+
+    <div class="panel">
+        <h3>Control Operativo y Riesgos</h3>
+        
+        <div class="control-group">
+            <label>Escenario de Mapeo</label>
+            <select id="scenario-select" onchange="changeScenario()">
+                <option value="static">Cámara Fría (10m Ancho x 5m Alto x 10m Largo)</option>
+                <option value="dynamic">Caja de Transporte (5m Ancho x 2.5m Alto x 2m Largo)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Carga Térmica Externa: <span id="ext-temp-val">30</span>°C</label>
+            <input type="range" id="ext-temp" min="-5" max="45" value="30" oninput="document.getElementById('ext-temp-val').innerText = this.value;">
+        </div>
+
+        <div class="event-btns">
+            <button class="btn-event" id="btn-power" onclick="togglePower()">⚡ FALLO ELÉCTRICO</button>
+            <button class="btn-event" id="btn-door" onclick="toggleDoor()">🚪 ABRIR PUERTAS</button>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-box"><div class="metric-value" id="val-temp">5.0 °C</div><div class="metric-label">Temp. Actual</div></div>
+            <div class="metric-box"><div class="metric-value" id="val-mkt">5.0 °C</div><div class="metric-label">MKT (Cinética Media)</div></div>
+            <div class="metric-box" style="background: #34495e;"><div class="metric-value" id="val-deg-rate" style="color: #f1c40f;">0.050 % / 24h</div><div class="metric-label">Tasa Proyectada (24h)</div></div>
+            <div class="metric-box" style="background: #c0392b;"><div class="metric-value" id="val-deg-total">0.0000 %</div><div class="metric-label">Degradación Acumulada</div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom: 10px;">
+            <button class="btn btn-start" id="btn-toggle" onclick="toggleSim()">INICIAR SIMULACIÓN</button>
+            <button class="btn btn-export" onclick="exportPDF()">DICTAMEN PDF</button>
+        </div>
+
+        <div class="control-group" style="padding-top: 10px; border-top: 1px solid #ddd;">
+            <label style="color: var(--azul);">Cargar Análisis Histórico (CSV: tiempo, temp)</label>
+            <input type="file" id="csv-file" accept=".csv" onchange="handleCSV(event)">
+        </div>
+
+        <hr style="border-top: 1px solid #ccc; margin: 15px 0;">
+
+        <h4>Añadir Sensor a la Malla 3D</h4>
+        <div class="coord-grid">
+            <div><label>X (Ancho):</label><input type="number" id="coord-x" value="5" step="0.5"></div>
+            <div><label>Y (Altura):</label><input type="number" id="coord-y" value="2.5" step="0.5"></div>
+            <div><label>Z (Largo):</label><input type="number" id="coord-z" value="5" step="0.5"></div>
+        </div>
+        <button class="btn btn-blue" onclick="addSensor()">CALCULAR RIESGO Y COLOCAR SENSOR 3D</button>
+        <button class="btn" onclick="clearMap()" style="background: #e74c3c; color: white; border: none; width: 100%; margin-top: 5px;">LIMPIAR MALLA</button>
+    </div>
+</div>
+
+<script>
+    // --- LÓGICA MOTOR 3D (THREE.JS) CON PUERTAS INTEGRADAS ---
+    let scene3D, camera3D, renderer3D, controls3D;
+    let sensors3D = [];
+    let roomMesh;
+    
+    const dims = {
+        static: { x: 10, y: 5, z: 10 },
+        dynamic: { x: 5, y: 2.5, z: 2 }
+    };
+
+    function init3D() {
+        const container = document.getElementById('map3D');
+        scene3D = new THREE.Scene();
+        scene3D.background = new THREE.Color(0xecf0f1);
+
+        camera3D = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        
+        // CRÍTICO PARA EL PDF: preserveDrawingBuffer garantiza que el canvas no se borre al tomar la foto
+        renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer3D.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer3D.domElement);
+
+        controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement);
+        controls3D.enableDamping = true;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene3D.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(10, 20, 10);
+        scene3D.add(dirLight);
+
+        // Grid (Plano base)
+        const gridHelper = new THREE.GridHelper(20, 20, 0x000000, 0x888888);
+        scene3D.add(gridHelper);
+
+        buildRoom();
+        animate3D();
+    }
+
+    function buildRoom() {
+        const scn = document.getElementById('scenario-select').value;
+        const d = dims[scn];
+
+        if(roomMesh) scene3D.remove(roomMesh);
+
+        // Crear una caja transparente para representar la habitación
+        const geometry = new THREE.BoxGeometry(d.x, d.y, d.z);
+        geometry.translate(d.x/2, d.y/2, d.z/2); 
+
+        const edges = new THREE.EdgesGeometry(geometry);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x2c3e50, linewidth: 2 });
+        const wireframe = new THREE.LineSegments(edges, lineMat);
+        
+        const mat = new THREE.MeshBasicMaterial({ color: 0x3498db, transparent: true, opacity: 0.1 });
+        roomMesh = new THREE.Mesh(geometry, mat);
+        roomMesh.add(wireframe);
+
+        // --- RENDERIZADO DE PUERTAS ---
+        if (scn === 'static') {
+            // Puerta de Cámara Fría (Aprox 2.5m de ancho x 3.5m de alto)
+            const doorGeo = new THREE.PlaneGeometry(2.5, 3.5);
+            const doorMat = new THREE.MeshBasicMaterial({ color: 0x3498db, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+            const door = new THREE.Mesh(doorGeo, doorMat);
+            
+            // Posicionar en la pared frontal (Z = máximo), centrada en X, apoyada en el piso
+            door.position.set(d.x / 2, 3.5 / 2, d.z);
+            
+            // Marco de la puerta
+            const doorEdges = new THREE.EdgesGeometry(doorGeo);
+            const doorLine = new THREE.LineSegments(doorEdges, new THREE.LineBasicMaterial({ color: 0x2c3e50, linewidth: 3 }));
+            door.add(doorLine);
+            
+            roomMesh.add(door);
+        } else {
+            // Puertas Traseras de la Caja de Transporte
+            const doorGeo = new THREE.PlaneGeometry(d.x, d.y);
+            const doorMat = new THREE.MeshBasicMaterial({ color: 0xe74c3c, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+            const door = new THREE.Mesh(doorGeo, doorMat);
+            
+            door.position.set(d.x / 2, d.y / 2, d.z);
+            
+            const doorEdges = new THREE.EdgesGeometry(doorGeo);
+            const doorLine = new THREE.LineSegments(doorEdges, new THREE.LineBasicMaterial({ color: 0x660033, linewidth: 3 }));
+            door.add(doorLine);
+            
+            roomMesh.add(door);
+        }
+        
+        scene3D.add(roomMesh);
+
+        // Ajustar cámara para que la puerta sea visible inmediatamente
+        camera3D.position.set(d.x * 1.8, d.y * 2.5, d.z * 1.8);
+        controls3D.target.set(d.x/2, d.y/2, d.z/2);
+        controls3D.update();
+    }
+
+    function animate3D() {
+        requestAnimationFrame(animate3D);
+        controls3D.update();
+        renderer3D.render(scene3D, camera3D);
+    }
+
+    // --- LÓGICA DE RIESGO Y MAPEO ---
+    function calculateRisk(x, y, z, scn) {
+        let risk = "BAJO (Estable)"; let colorHex = 0x2ecc71; // Verde
+        
+        if (scn === 'static') {
+            // El riesgo es ALTO si el sensor se acerca al techo o a la puerta (z > 8.5)
+            if (y >= 4.0 || z >= 8.5) { risk = "ALTO (Estratificación/Puerta)"; colorHex = 0xe74c3c; }
+            else if ((x > 4 && x < 6) && z < 2 && y >= 3.5) { risk = "ALTO (Punto Frío - Difusor)"; colorHex = 0xe74c3c; }
+            else if (y >= 3.0 || z >= 7.0) { risk = "MEDIO (Transición)"; colorHex = 0xf1c40f; }
+        } else {
+            if (y >= 2.0 || x >= 4.5 || x <= 0.5 || z >= 1.5 || z <= 0.5) { risk = "ALTO (Radiación/Carga Térmica)"; colorHex = 0xe74c3c; }
+            else if (y >= 1.5 || x >= 3.5) { risk = "MEDIO (Transición)"; colorHex = 0xf1c40f; }
+        }
+        return { text: risk, color: colorHex };
+    }
+
+    function addSensor() {
+        const scn = document.getElementById('scenario-select').value;
+        const currentDim = dims[scn];
+        
+        const x = parseFloat(document.getElementById('coord-x').value);
+        const y = parseFloat(document.getElementById('coord-y').value);
+        const z = parseFloat(document.getElementById('coord-z').value);
+
+        if(x < 0 || x > currentDim.x || y < 0 || y > currentDim.y || z < 0 || z > currentDim.z) {
+            alert(`Coordenadas fuera de límite. Dimensiones máximas: X:${currentDim.x}, Y:${currentDim.y}, Z:${currentDim.z}`); return;
+        }
+
+        const risk = calculateRisk(x, y, z, scn);
+
+        // Crear esfera 3D (Sensor)
+        const geo = new THREE.SphereGeometry(0.3, 16, 16);
+        const mat = new THREE.MeshLambertMaterial({ color: risk.color });
+        const sphere = new THREE.Mesh(geo, mat);
+        sphere.position.set(x, y, z);
+        scene3D.add(sphere);
+
+        const sId = sensors3D.length + 1;
+        sensors3D.push({ id: sId, x, y, z, riskText: risk.text, riskColor: risk.color, mesh: sphere });
+        
+        updateTable();
+    }
+
+    function updateTable() {
+        const tbody = document.querySelector('#sensor-table tbody');
+        tbody.innerHTML = '';
+        sensors3D.forEach(s => {
+            const htmlColor = s.riskColor === 0xe74c3c ? '#e74c3c' : (s.riskColor === 0xf1c40f ? '#f39c12' : '#27ae60');
+            const row = document.createElement('tr');
+            row.innerHTML = `<td><b>S${s.id}</b></td><td>${s.x}</td><td>${s.y}</td><td>${s.z}</td><td style="font-weight:bold; color:${htmlColor}">${s.riskText}</td>`;
+            tbody.appendChild(row);
+        });
+    }
+
+    function clearMap() {
+        sensors3D.forEach(s => scene3D.remove(s.mesh));
+        sensors3D = [];
+        updateTable();
+    }
+    
+    function changeScenario() {
+        const scn = document.getElementById('scenario-select').value;
+        document.getElementById('coord-x').value = dims[scn].x / 2;
+        document.getElementById('coord-y').value = dims[scn].y / 2;
+        document.getElementById('coord-z').value = dims[scn].z / 2;
+        clearMap();
+        buildRoom();
+    }
+
+    // Inicializar 3D
+    init3D();
+    changeScenario();
+
+    // --- SIMULACIÓN Y GRÁFICOS ---
+    let simInterval = null, time = 0, isRunning = false, dataPoints = [], logExcursiones = [];
+    let isPowerFailed = false, isDoorOpen = false, totalDegradation = 0;
+    const Ea = 83.144, R = 0.008314, deltaH_R = 10000, Tref_K = 278.15, baseDailyRate = 0.05;
+    
+    const ctxChart = document.getElementById('tempChart').getContext('2d');
+    const chart = new Chart(ctxChart, {
+        type: 'line',
+        data: { labels: [], datasets: [
+            { label: 'Temperatura Promedio (°C)', data: [], borderColor: '#660033', backgroundColor: 'rgba(102, 0, 51, 0.1)', borderWidth: 2, fill: true, pointRadius: 1 },
+            { label: 'Límite Superior (8°C)', data: [], borderColor: '#e74c3c', borderWidth: 1, borderDash: [5, 5], pointRadius: 0 }
+        ]},
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 25 } }, animation: { duration: 0 } }
+    });
+
+    function togglePower() {
+        isPowerFailed = !isPowerFailed;
+        document.getElementById('btn-power').classList.toggle('active-power');
+    }
+
+    function toggleDoor() {
+        isDoorOpen = !isDoorOpen;
+        document.getElementById('btn-door').classList.toggle('active-door');
+    }
+
+    function toggleSim() {
+        if (isRunning) { clearInterval(simInterval); isRunning = false; document.getElementById('btn-toggle').innerText = "REANUDAR SIMULACIÓN"; } 
+        else { isRunning = true; simInterval = setInterval(stepSim, 1000); document.getElementById('btn-toggle').innerText = "DETENER SIMULACIÓN"; }
+    }
+
+    function stepSim() {
+        time++;
+        const extTemp = parseFloat(document.getElementById('ext-temp').value);
+        let currentTemp = dataPoints.length > 0 ? dataPoints[dataPoints.length-1] : 5.0;
+        
+        let coolingPower = isPowerFailed ? 0 : -0.15; 
+        let insulationFactor = isDoorOpen ? 0.25 : 0.02; 
+        let heatTransfer = (extTemp - currentTemp) * insulationFactor;
+        let setpointPull = isPowerFailed ? 0 : (5.0 - currentTemp) * 0.1; 
+        let noise = (Math.random() - 0.5) * 0.4;
+
+        currentTemp += coolingPower + heatTransfer + setpointPull + noise;
+        if(currentTemp < 2 && !isPowerFailed) currentTemp = 2 + Math.random(); 
+        
+        dataPoints.push(currentTemp);
+
+        let sumExp = 0;
+        dataPoints.forEach(t => sumExp += Math.exp(-deltaH_R / (t + 273.15)));
+        let mkt = (deltaH_R / (-Math.log(sumExp / dataPoints.length))) - 273.15;
+
+        let FA = Math.exp((Ea/R) * ((1/Tref_K) - (1/(currentTemp + 273.15))));
+        let rate24h = baseDailyRate * FA;
+        totalDegradation += rate24h / (24 * 60);
+
+        if (currentTemp > 8) logExcursiones.push({ time: time, temp: currentTemp, event: isPowerFailed ? "Fallo Eléctrico" : (isDoorOpen ? "Puertas Abiertas" : "Carga Térmica/Falla") });
+
+        document.getElementById('val-temp').innerText = currentTemp.toFixed(1) + ' °C';
+        document.getElementById('val-mkt').innerText = mkt.toFixed(1) + ' °C';
+        document.getElementById('val-deg-rate').innerText = rate24h.toFixed(3) + ' % / 24h';
+        document.getElementById('val-deg-total').innerText = totalDegradation.toFixed(6) + ' %';
+
+        chart.data.labels.push(time);
+        chart.data.datasets[0].data.push(currentTemp);
+        chart.data.datasets[1].data.push(8);
+        if(chart.data.labels.length > 60) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); chart.data.datasets[1].data.shift(); }
+        chart.update();
+    }
+
+    // --- CARGA DE CSV ---
+    function handleCSV(event) {
+        const file = event.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const rows = text.split('\n');
+            time = 0; dataPoints = []; totalDegradation = 0; logExcursiones = [];
+            chart.data.labels = []; chart.data.datasets[0].data = []; chart.data.datasets[1].data = [];
+            
+            rows.forEach((row, index) => {
+                const cols = row.split(',');
+                if(cols.length >= 2 && index > 0) { 
+                    let val = parseFloat(cols[1]);
+                    if(!isNaN(val)) {
+                        time++; dataPoints.push(val);
+                        if(val > 8) logExcursiones.push({ time: time, temp: val, event: "Excursión Histórica CSV" });
+                        let FA = Math.exp((Ea/R) * ((1/Tref_K) - (1/(val + 273.15))));
+                        let rate24h = baseDailyRate * FA;
+                        totalDegradation += rate24h / (24 * 60); 
+                        chart.data.labels.push(time); chart.data.datasets[0].data.push(val); chart.data.datasets[1].data.push(8);
+                    }
+                }
+            });
+            chart.update();
+            let mkt = 0;
+            if(dataPoints.length > 0) {
+                let sumExp = 0; dataPoints.forEach(t => sumExp += Math.exp(-deltaH_R / (t + 273.15)));
+                mkt = (deltaH_R / (-Math.log(sumExp / dataPoints.length))) - 273.15;
+                const lastTemp = dataPoints[dataPoints.length-1];
+                let FA = Math.exp((Ea/R) * ((1/Tref_K) - (1/(lastTemp + 273.15))));
+                document.getElementById('val-deg-rate').innerText = (baseDailyRate * FA).toFixed(3) + ' % / 24h';
+                document.getElementById('val-temp').innerText = lastTemp.toFixed(1) + ' °C';
+            }
+            document.getElementById('val-mkt').innerText = mkt.toFixed(1) + ' °C';
+            document.getElementById('val-deg-total').innerText = totalDegradation.toFixed(6) + ' %';
+            alert("Análisis histórico CSV completado.");
+        };
+        reader.readAsText(file);
+    }
+
+    // --- DICTAMEN PDF (INFALIBLE CON THREE.JS) ---
+    function exportPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFillColor(102, 0, 51); doc.rect(0, 0, 210, 20, 'F');
+        doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont("helvetica", "bold");
+        doc.text("DICTAMEN DE CARACTERIZACIÓN (MALLA 3D Y CINÉTICA)", 10, 14);
+        
+        doc.setTextColor(0, 0, 0); doc.setFontSize(10);
+        let y = 30;
+
+        const scnText = document.getElementById('scenario-select').options[document.getElementById('scenario-select').selectedIndex].text;
+        doc.setFont("helvetica", "bold"); doc.text("1. ALCANCE OPERATIVO", 10, y); y += 6;
+        doc.setFont("helvetica", "normal"); doc.text(`Escenario: ${scnText}. \nEvaluación de riesgos espaciales y degradación (NOM-073).`, 10, y); y += 15;
+        
+        doc.setFont("helvetica", "bold"); doc.text("2. DISTRIBUCIÓN DE MALLA ESPACIAL (RENDER 3D)", 10, y); y += 6;
+        
+        // --- EL SECRETO PARA EL PDF PERFECTO EN 3D ---
+        renderer3D.render(scene3D, camera3D); // Forzamos un renderizado de la escena justo antes de tomar la foto
+        const mapDataURL3D = renderer3D.domElement.toDataURL('image/png', 1.0); // Tomamos la foto
+        doc.addImage(mapDataURL3D, 'PNG', 10, y, 190, 105); 
+        y += 110;
+
+        doc.setFont("helvetica", "bold"); doc.text("3. JUSTIFICACIÓN DE RIESGO POR COORDENADA (X, Y, Z)", 10, y); y += 6;
+        doc.setFontSize(9); doc.setFont("helvetica", "normal");
+        if(sensors3D.length === 0) { doc.text("No se mapearon sensores.", 10, y); }
+        else {
+            sensors3D.forEach(s => { doc.text(`S${s.id} -> [X:${s.x}m, Y:${s.y}m, Z:${s.z}m] | Riesgo: ${s.riskText}`, 10, y); y += 5; });
+        }
+
+        if(dataPoints.length > 0) {
+            doc.addPage();
+            y = 20;
+            doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text("4. ANÁLISIS CINÉTICO Y LOG DE EXCURSIONES", 10, y); y += 6;
+            doc.setFont("helvetica", "normal"); 
+            doc.text(`MKT Calculado: ${document.getElementById('val-mkt').innerText}`, 10, y); y+=5;
+            doc.text(`Tasa de Degradación Proyectada: ${document.getElementById('val-deg-rate').innerText}`, 10, y); y+=5;
+            doc.text(`Degradación Total Acumulada: ${totalDegradation.toFixed(6)} %`, 10, y); y+=10;
+            
+            if(logExcursiones.length === 0) { doc.text("Sin excursiones.", 10, y); y+=10;}
+            else {
+                let limit = Math.min(logExcursiones.length, 5);
+                for(let i=0; i<limit; i++) { doc.text(`- Min ${logExcursiones[i].time}: ${logExcursiones[i].temp.toFixed(2)} °C (${logExcursiones[i].event})`, 10, y); y += 5; }
+                y += 5;
+            }
+
+            doc.setFont("helvetica", "bold"); doc.text("5. GRÁFICO DE TENDENCIA TÉRMICA", 10, y); y += 6;
+            const cvs = document.getElementById('tempChart');
+            doc.addImage(cvs.toDataURL('image/png', 1.0), 'PNG', 10, y, 190, 80);
+        }
+
+        doc.save("Reporte_SEVA_Mapeo3D_Cinetica_Final.pdf");
+    }
+</script>
+</body>
+</html>

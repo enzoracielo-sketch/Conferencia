@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SEVAMETROLOGÍA - Simulador de Auditoría COFEPRIS (Nivel Experto)</title>
+    <style>
+        :root {
+            --guinda: #660033;
+            --guinda-claro: #8a0045;
+            --negro: #1a1a1a;
+            --gris-bg: #f4f7f6;
+            --critico: #dc3545;
+            --mayor: #ffc107;
+            --satisfactorio: #28a745;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: #cfd9df; padding: 20px; color: var(--negro); margin: 0; display: flex; justify-content: center; min-height: 100vh; align-items: center;}
+        
+        .main-card { width: 100%; max-width: 1100px; background: white; padding: 40px; border-radius: 12px; border-top: 10px solid var(--guinda); box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; overflow: hidden;}
+        
+        .audit-status-bar { display: flex; justify-content: space-between; align-items: center; background: #e9ecef; padding: 15px 20px; border-radius: 8px; margin-bottom: 30px; border: 2px solid #ccc; font-weight: bold; font-size: 1.1rem; }
+        .score-badge { padding: 8px 15px; border-radius: 6px; color: white; background: var(--negro); font-size: 1.2rem; transition: background 0.3s; }
+
+        .header-title { text-align: center; margin-bottom: 30px; }
+        .header-title h1 { color: var(--guinda); margin: 0; font-size: 2.2rem; text-transform: uppercase; }
+        .header-title p { margin: 5px 0 0; font-size: 1.1rem; color: #555; font-weight: 600; }
+
+        .scenario-container { display: none; animation: fadeIn 0.5s ease-in-out; }
+        .scenario-container.active { display: block; }
+        
+        .scenario-question { font-size: 1.3rem; color: var(--negro); font-weight: bold; margin-bottom: 25px; line-height: 1.5; border-left: 5px solid var(--guinda); padding-left: 15px; background: #fdfdfd; padding-top: 10px; padding-bottom: 10px; }
+        
+        .options-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        
+        .option-btn { background: white; border: 2px solid #ddd; padding: 18px; border-radius: 8px; text-align: left; font-size: 1.05rem; cursor: pointer; transition: all 0.2s; font-weight: 600; color: var(--negro); display: flex; align-items: center; gap: 15px; }
+        .option-btn:hover { border-color: var(--guinda); transform: translateY(-2px); box-shadow: 0 6px 12px rgba(102,0,51,0.1); background: #fdfafb; }
+        .option-btn .letter { background: var(--guinda); color: white; width: 35px; height: 35px; display: flex; justify-content: center; align-items: center; border-radius: 4px; font-weight: bold; flex-shrink: 0; font-size: 1.2rem;}
+
+        .feedback-panel { margin-top: 30px; padding: 25px; border-radius: 8px; display: none; color: white; box-shadow: inset 0 0 20px rgba(0,0,0,0.1); animation: fadeIn 0.4s; }
+        .feedback-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; text-transform: uppercase; }
+        .feedback-text { font-size: 1.1rem; line-height: 1.5; margin-bottom: 20px; }
+        .feedback-norm { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 6px; font-size: 0.95rem; font-style: italic; border-left: 4px solid rgba(255,255,255,0.5); }
+
+        .btn-next { background: var(--negro); color: white; border: none; padding: 15px 30px; border-radius: 6px; font-size: 1.1rem; font-weight: bold; cursor: pointer; float: right; margin-top: 20px; transition: background 0.3s; }
+        .btn-next:hover { background: #333; }
+
+        .final-screen { text-align: center; display: none; padding: 40px; }
+        .final-screen h2 { font-size: 2.8rem; color: var(--guinda); margin-bottom: 10px; }
+        .final-screen p { font-size: 1.4rem; margin-bottom: 40px; line-height: 1.6; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="main-card">
+    <div class="header-title">
+        <h1>Simulador de Decisiones Regulatorias Avanzadas</h1>
+        <p>Evaluación de Criterio Técnico: OMS 961, USP &lt;1079&gt; y NOM-059</p>
+    </div>
+
+    <div class="audit-status-bar">
+        <span>Fase de Inspección: <span id="progress-text">1 de 5</span></span>
+        <div class="score-badge" id="audit-score">Estatus: EVALUANDO...</div>
+    </div>
+
+    <!-- ESCENARIO 1 -->
+    <div class="scenario-container active" id="sc-1">
+        <div class="scenario-question">
+            1. Geometría Sensorial: Al mapear un almacén con racks de 10 metros de altura, el protocolo de validación indica colocar dataloggers directamente en las salidas de inyección del sistema HVAC para "garantizar la captura del aire más frío". El producto se estiba hasta una altura máxima de 8.5 metros. ¿Cuál es el dictamen?
+        </div>
+        <div class="options-grid">
+            <button class="option-btn" onclick="selectAnswer(1, 'A')"><span class="letter">A</span> Es un procedimiento conforme. Es un requisito medir el ΔT (Delta T) entre la inyección y el retorno del sistema HVAC para demostrar capacidad de enfriamiento.</button>
+            <button class="option-btn" onclick="selectAnswer(1, 'B')"><span class="letter">B</span> Observación Crítica. Los sensores miden la temperatura del HVAC, no del entorno del producto. La malla 3D debe limitarse estrictamente a la altura máxima de almacenamiento permitido.</button>
+            <button class="option-btn" onclick="selectAnswer(1, 'C')"><span class="letter">C</span> Observación Menor. Faltó colocar sensores en los andenes, pero la posición en los difusores es correcta como puntos de control maestro.</button>
+        </div>
+    </div>
+
+    <!-- ESCENARIO 2 -->
+    <div class="scenario-container" id="sc-2">
+        <div class="scenario-question">
+            2. Uso del MKT en Excursiones: Durante el fin de semana, una cámara fría (2°C - 8°C) que almacena vacunas virales atenuadas registra una excursión a 11.5°C por 3.5 horas. Aseguramiento de Calidad calcula la Temperatura Cinética Media (MKT) del mes, resultando en 7.2°C, y dictamina la liberación del lote. ¿Qué acción toma el auditor?
+        </div>
+        <div class="options-grid">
+            <button class="option-btn" onclick="selectAnswer(2, 'A')"><span class="letter">A</span> Aprobación directa. La MKT (7.2°C) es matemáticamente inferior al límite de 8.0°C, demostrando que termodinámicamente el lote no sufrió impacto acelerado.</button>
+            <button class="option-btn" onclick="selectAnswer(2, 'B')"><span class="letter">B</span> Observación Mayor. Faltó adjuntar la gráfica del factor de Arrhenius al expediente de liberación, aunque la decisión de no rechazar el lote es correcta al durar menos de 24 horas.</button>
+            <button class="option-btn" onclick="selectAnswer(2, 'C')"><span class="letter">C</span> Observación Crítica. El cálculo de MKT es inaplicable y prohibido para productos biológicos sin estudios de estabilidad en excursiones térmicas específicas.</button>
+        </div>
+    </div>
+
+    <!-- ESCENARIO 3 -->
+    <div class="scenario-container" id="sc-3">
+        <div class="scenario-question">
+            3. Trazabilidad Metrológica: Un contratista ejecuta un mapeo térmico (PQ) en sus ultra-congeladores a -70°C. Al revisar los certificados del CENAM/EMA de los dataloggers utilizados como patrón, nota que fueron calibrados en los puntos de -20°C, 0°C y 20°C, con una incertidumbre de ±0.3°C.
+        </div>
+        <div class="options-grid">
+            <button class="option-btn" onclick="selectAnswer(3, 'A')"><span class="letter">A</span> Observación Crítica. Los dataloggers están operando por extrapolación muy fuera de su rango calibrado. Los datos del mapeo carecen de validez metrológica legal.</button>
+            <button class="option-btn" onclick="selectAnswer(3, 'B')"><span class="letter">B</span> Procedimiento Conforme. Los sensores cuentan con trazabilidad oficial y la incertidumbre declarada (±0.3°C) cumple el requisito normativo de ser menor a ±0.5°C.</button>
+            <button class="option-btn" onclick="selectAnswer(3, 'C')"><span class="letter">C</span> Observación Mayor. El estudio es válido pero el contratista debió aplicar un factor de corrección polinomial en el software para compensar la curva de error a -70°C.</button>
+        </div>
+    </div>
+
+    <!-- ESCENARIO 4 -->
+    <div class="scenario-container" id="sc-4">
+        <div class="scenario-question">
+            4. Análisis de Datos (Data Loggers): En un mapeo térmico de un almacén (15°C a 25°C), el sensor S-14 ubicado junto a un andén registra 25.8°C durante 18 minutos exactos debido a la apertura de cortinas. El resto de los 7 días el sensor promedió 22°C. ¿Cómo debe resolverse en el reporte final?
+        </div>
+        <div class="options-grid">
+            <button class="option-btn" onclick="selectAnswer(4, 'A')"><span class="letter">A</span> Se dictamina "No Conforme" y se aborta el estudio. El área falló el criterio de aceptación absoluto y se debe rediseñar el HVAC antes de repetir los 7 días.</button>
+            <button class="option-btn" onclick="selectAnswer(4, 'B')"><span class="letter">B</span> Procedimiento Conforme. Se justifica mediante el cálculo de la inercia térmica (masa térmica del producto), demostrando que la excursión del aire no impactó la temperatura real del medicamento.</button>
+            <button class="option-btn" onclick="selectAnswer(4, 'C')"><span class="letter">C</span> Observación Mayor. Se debe aplicar una técnica de "suavizado" promediando el S-14 con el sensor más cercano para que la lectura documentada baje a 24.8°C y cumpla la norma.</button>
+        </div>
+    </div>
+
+    <!-- ESCENARIO 5 -->
+    <div class="scenario-container" id="sc-5">
+        <div class="scenario-question">
+            5. Mantenimiento del Estado Validado: El almacén de producto terminado mantiene históricamente 20°C. Para cumplir metas de ahorro energético, Ingeniería cambia el "setpoint" del termostato a 23°C (el límite normativo es 25°C). Argumentan que no hay riesgo operativo.
+        </div>
+        <div class="options-grid">
+            <button class="option-btn" onclick="selectAnswer(5, 'A')"><span class="letter">A</span> Procedimiento Conforme. Al estar configurado por debajo del límite de especificación (25°C), es un ajuste operativo que no requiere validación adicional.</button>
+            <button class="option-btn" onclick="selectAnswer(5, 'B')"><span class="letter">B</span> Observación Mayor. Solo es necesario calibrar nuevamente el sensor maestro del HVAC a 23°C para asegurar que los bucles de control PID respondan correctamente.</button>
+            <button class="option-btn" onclick="selectAnswer(5, 'C')"><span class="letter">C</span> Observación Crítica. Un cambio en el setpoint altera los gradientes térmicos y patrones de flujo espaciales. Requiere análisis de riesgos y un re-mapeo para demostrar que los "hot spots" no superan ahora los 25°C.</button>
+        </div>
+    </div>
+
+    <!-- CAJA DE RETROALIMENTACIÓN -->
+    <div class="feedback-panel" id="feedback-box">
+        <div class="feedback-title" id="fb-title"></div>
+        <div class="feedback-text" id="fb-text"></div>
+        <div class="feedback-norm" id="fb-norm"></div>
+        <button class="btn-next" id="btn-continue" onclick="nextScenario()">Continuar al Siguiente Reto ➔</button>
+    </div>
+
+    <!-- PANTALLA FINAL DE DICTAMEN -->
+    <div class="final-screen" id="sc-final">
+        <h2 id="final-title">Auditoría Concluida</h2>
+        <p id="final-message"></p>
+        <button class="btn-next" style="float:none; background:var(--guinda);" onclick="location.reload()">Reiniciar Simulador</button>
+    </div>
+
+</div>
+
+<script>
+    let currentScenario = 1;
+    let errorScore = 0; // 0 = Perfecto, 1 = Mayor, 2 = Crítico
+
+    // Base de datos de respuestas y fundamentos técnicos (OMS, USP, NOM)
+    const answers = {
+        1: {
+            'A': { status: 'mayor', title: '⚠️ OBSERVACIÓN MAYOR', text: 'Trampa común. Aunque medir el delta del equipo es útil para ingeniería, un protocolo de Calificación Térmica (PQ) debe demostrar las condiciones en el entorno de almacenamiento, no el desempeño aislado del inyector.', norm: 'Ref: OMS 961, Anexo 9. Se debe mapear la zona donde el producto está físicamente expuesto.' },
+            'B': { status: 'satisfactorio', title: '✅ PROCEDIMIENTO CONFORME', text: 'Criterio Metrológico Exacto. Los sensores no deben colocarse más allá de la altura útil de estiba. Colocarlos en difusores arroja "Falsos Positivos" (lecturas demasiado frías) que no representan el estrés real del producto.', norm: 'Ref: USP <1079> Buenas Prácticas de Almacenamiento y Distribución.' },
+            'C': { status: 'critico', title: '🚨 OBSERVACIÓN CRÍTICA', text: 'El diseño del protocolo es deficiente y no representa la realidad termodinámica del almacén. Es un incumplimiento estructural de las guías de validación.', norm: 'Ref: NOM-059-SSA1-2015. El mapeo debe justificar racionalmente la ubicación de la malla volumétrica tridimensional.' }
+        },
+        2: {
+            'A': { status: 'critico', title: '🚨 OBSERVACIÓN CRÍTICA (RIESGO AL PACIENTE)', text: 'Cálculo engañoso. La MKT disfraza excursiones agudas que pueden destruir biológicos. Una vacuna sometida a 11.5°C sufre una desnaturalización de proteínas que el cálculo matemático promedio no refleja.', norm: 'Ref: USP <1079>. "La MKT NO es aplicable a productos biológicos, vacunas o proteínas sin datos explícitos de estabilidad a temperaturas aceleradas".' },
+            'B': { status: 'mayor', title: '⚠️ OBSERVACIÓN MAYOR', text: 'La regla de las "24 horas" es una leyenda urbana sin sustento científico. Cualquier excursión en productos de cadena fría estricta debe investigarse mediante un control de desviaciones.', norm: 'Ref: Informe OMS 961. Manejo de Excursiones de Temperatura en Cadena de Frío.' },
+            'C': { status: 'satisfactorio', title: '✅ PROCEDIMIENTO CONFORME', text: 'Decisión Regulatoria Correcta. Aplicar MKT a biológicos sin datos de estabilidad es una de las fallas más penalizadas internacionalmente. El producto entra a cuarentena obligatoria.', norm: 'Ref: Guía de Gestión de Riesgos PIC/S y USP <1079>.' }
+        },
+        3: {
+            'A': { status: 'satisfactorio', title: '✅ PROCEDIMIENTO CONFORME', text: 'Excelente rigor metrológico. Un datalogger calibrado a -20°C utilizado para medir -70°C está realizando una "extrapolación severa". La curva de error de la termorresistencia no es lineal, los datos recolectados son metrológicamente inválidos.', norm: 'Ref: NMX-EC-17025-IMNC (ISO 17025). "El rango de calibración debe bracketing (abrazar) el rango de operación previsto".' },
+            'B': { status: 'critico', title: '🚨 OBSERVACIÓN CRÍTICA', text: '¡Falso! La incertidumbre de ±0.3°C solo está garantizada DENTRO de los puntos calibrados (-20°C a 20°C). A -70°C el error del equipo es matemáticamente desconocido.', norm: 'Ref: Centro Nacional de Metrología (CENAM) - Trazabilidad de las Mediciones.' },
+            'C': { status: 'mayor', title: '⚠️ OBSERVACIÓN MAYOR', text: 'Es una práctica de alto riesgo. Ningún auditor aceptará datos crudos manipulados por un "factor de corrección" fuera del rango de laboratorio certificado por la EMA.', norm: 'Ref: 21 CFR Parte 11 (Integridad de Datos) / ISPE Good Practice Guide.' }
+        },
+        4: {
+            'A': { status: 'mayor', title: '⚠️ OBSERVACIÓN MAYOR', text: 'Decisión financieramente inviable y técnicamente inmadura. Abortar el estudio por una excursión transitoria de 18 min en la zona de andén denota falta de comprensión termodinámica.', norm: 'Ref: OMS Anexo 9. Se debe distinguir entre temperatura del aire (fluctuante) y temperatura del producto (estable).' },
+            'B': { status: 'satisfactorio', title: '✅ PROCEDIMIENTO CONFORME', text: 'Criterio Técnico Avanzado. El aire cambia de temperatura casi instantáneamente, pero el líquido/sólido del producto tiene una "masa térmica" que absorbe el impacto. Justificar la inercia térmica salva el estudio y demuestra control profundo.', norm: 'Ref: USP <1079>. Uso de simuladores de producto (damped sensors) o cálculos de transferencia de calor.' },
+            'C': { status: 'critico', title: '🚨 OBSERVACIÓN CRÍTICA (FALSIFICACIÓN)', text: '¡Intento de Fraude! Promediar y "suavizar" lecturas individuales para forzar el cumplimiento es falsificación de datos (Data Falsification). Esto garantiza la clausura de la planta.', norm: 'Ref: NOM-059-SSA1. Buenas Prácticas de Documentación e Integridad de Datos ALCOA+.' }
+        },
+        5: {
+            'A': { status: 'critico', title: '🚨 OBSERVACIÓN CRÍTICA', text: 'Pérdida del Estado Validado. La validación se otorgó bajo condiciones específicas. Al subir la temperatura base, los "puntos calientes" del almacén (Hot Spots) pueden ahora cruzar fácilmente los 25°C, invalidando el control.', norm: 'Ref: Guía de Calificación OMS. "Los cambios en parámetros de control de HVAC requieren re-evaluación del mapeo".' },
+            'B': { status: 'mayor', title: '⚠️ OBSERVACIÓN MAYOR', text: 'Calibrar el sensor no resuelve el problema termodinámico. El aire caliente se estratificará de forma diferente afectando las partes superiores de los racks de forma imprevista.', norm: 'Ref: Sistema de Gestión de Calidad (CAPA y Control de Cambios).' },
+            'C': { status: 'satisfactorio', title: '✅ PROCEDIMIENTO CONFORME', text: 'Protección absoluta de la operación. Cualquier alteración a los parámetros de operación del HVAC dispara el Sistema de Control de Cambios. Un mapeo (aunque sea parcial y enfocado) evidencia que la nueva configuración no compromete la calidad.', norm: 'Ref: NOM-059-SSA1-2015. Requisitos para el Mantenimiento del Estado Validado.' }
+        }
+    };
+
+    function selectAnswer(scenarioId, choice) {
+        // Bloquear botones tras responder
+        const buttons = document.querySelectorAll(`#sc-${scenarioId} .option-btn`);
+        buttons.forEach(btn => btn.style.pointerEvents = 'none');
+
+        const result = answers[scenarioId][choice];
+        const fbBox = document.getElementById('feedback-box');
+        
+        // Estilar la caja de retroalimentación
+        if(result.status === 'critico') { 
+            fbBox.style.background = 'var(--critico)'; 
+            errorScore += 2; 
+        } else if(result.status === 'mayor') { 
+            fbBox.style.background = 'var(--mayor)'; 
+            fbBox.style.color = '#000'; 
+            document.getElementById('fb-norm').style.borderColor = '#000';
+            errorScore += 1; 
+        } else { 
+            fbBox.style.background = 'var(--satisfactorio)'; 
+            fbBox.style.color = '#fff'; 
+        }
+
+        // Estilo del botón continuar
+        if(result.status === 'mayor') document.getElementById('btn-continue').style.background = '#000';
+        else document.getElementById('btn-continue').style.background = 'rgba(0,0,0,0.5)';
+
+        document.getElementById('fb-title').innerText = result.title;
+        document.getElementById('fb-text').innerText = result.text;
+        document.getElementById('fb-norm').innerText = result.norm;
+
+        fbBox.style.display = 'block';
+
+        // Actualizar Badge Sanitario
+        const badge = document.getElementById('audit-score');
+        if(errorScore >= 4) { 
+            badge.style.background = 'var(--critico)'; 
+            badge.innerText = 'ESTATUS: CLAUSURA INMINENTE'; 
+        } else if(errorScore > 0) { 
+            badge.style.background = 'var(--mayor)'; 
+            badge.style.color = '#000'; 
+            badge.innerText = 'ESTATUS: OBSERVACIONES MAYORES'; 
+        } else { 
+            badge.style.background = 'var(--satisfactorio)'; 
+            badge.innerText = 'ESTATUS: SIN DESVIACIONES'; 
+        }
+    }
+
+    function nextScenario() {
+        document.getElementById(`sc-${currentScenario}`).classList.remove('active');
+        document.getElementById('feedback-box').style.display = 'none';
+        
+        currentScenario++;
+        
+        if(currentScenario <= 5) {
+            document.getElementById(`sc-${currentScenario}`).classList.add('active');
+            document.getElementById('progress-text').innerText = `${currentScenario} de 5`;
+        } else {
+            // FIN DE LA AUDITORÍA
+            document.getElementById('progress-text').innerText = `AUDITORÍA CERRADA`;
+            document.getElementById('sc-final').style.display = 'block';
+            const finalMsg = document.getElementById('final-message');
+            const finalTitle = document.getElementById('final-title');
+            
+            if(errorScore >= 4) {
+                finalTitle.innerText = "🚨 INSTALACIÓN CLAUSURADA 🚨";
+                finalTitle.style.color = "var(--critico)";
+                finalMsg.innerHTML = "<strong>Falta de conocimiento normativo.</strong><br><br>Su operación no está sustentada en metrología técnica real. Las decisiones tomadas comprometen gravemente la calidad del producto y la seguridad del paciente.";
+            } else if(errorScore > 0) {
+                finalTitle.innerText = "⚠️ CERTIFICACIÓN CONDICIONADA ⚠️";
+                finalTitle.style.color = "#d39e00";
+                finalMsg.innerHTML = "<strong>Requiere Plan de Remediación Urgente (CAPA).</strong><br><br>Sobrevivió la inspección, pero el auditor detectó serias lagunas en sus justificaciones científicas. Requiere la asesoría de expertos externos para blindar sus procesos.";
+            } else {
+                finalTitle.innerText = "🏆 EXCELENCIA REGULATORIA 🏆";
+                finalTitle.style.color = "var(--satisfactorio)";
+                finalMsg.innerHTML = "<strong>Dictamen Cero Observaciones.</strong><br><br>Usted entiende perfectamente que la calificación no es imprimir papeles, es demostrar matemáticamente el control termodinámico de su almacén. Su operación está totalmente protegida.";
+            }
+        }
+    }
+</script>
+</body>
+</html>

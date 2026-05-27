@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SEVAMETROLOGÍA - Simulador de Calificación 3D v17.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root { --guinda: #660033; --negro: #000000; --gris-bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: #cfd9df; padding: 20px; color: var(--negro); margin: 0; user-select: none; }
+        .main-card { max-width: 1400px; margin: auto; background: white; padding: 35px; border-radius: 12px; border-top: 10px solid var(--guinda); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 25px; border-bottom: 3px solid var(--guinda); padding-bottom: 10px; }
+        .tab-btn { background: #e0e0e0; color: var(--negro); border: none; padding: 12px 20px; font-size: 1rem; font-weight: bold; cursor: pointer; border-radius: 6px 6px 0 0; }
+        .tab-btn.active { background: var(--guinda); color: white; }
+        .tab-content { display: none; background: var(--gris-bg); padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
+        .tab-content.active { display: block; }
+
+        h2 { color: var(--guinda); text-transform: uppercase; font-size: 1.1rem; border-bottom: 2px solid var(--guinda); padding-bottom: 5px; margin-top: 0; }
+        label { font-weight: bold; font-size: 0.85rem; display: block; margin: 10px 0 5px; color: var(--negro); }
+        
+        table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; font-size: 0.78rem; border: 2px solid var(--negro); }
+        th { background: var(--guinda); color: white; padding: 10px; border: 1px solid var(--negro); }
+        td { border: 1px solid var(--negro); padding: 6px; font-weight: bold; }
+        
+        input, select, textarea { width: 100%; padding: 6px; border: 2px solid #ccc; border-radius: 4px; box-sizing: border-box; font-weight: bold; font-size: 0.78rem; }
+        .coord-input { width: 68px; display: inline-block; text-align: center; margin: 2px 0; padding: 4px; border: 2px solid #000; }
+        
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-add { background: #28a745; color: white; margin-top: 10px; }
+        .btn-auto { background: #17a2b8; color: white; margin-top: 10px; margin-left: 10px; }
+        .btn-action { background: var(--guinda); color: white; width: 100%; padding: 15px; margin-top: 25px; border-radius: 6px; font-size: 1.1rem; font-weight: bold; border: none; cursor: pointer; border: 3px solid #000; }
+
+        /* ESCENARIO GRÁFICO MAXIMIZADO */
+        .canvas-3d { width: 100%; height: 650px; background: #fff; border: 3px solid #000; border-radius: 8px; display: flex; justify-content: center; align-items: center; perspective: 1500px; overflow: hidden; position: relative; cursor: grab; }
+        .canvas-3d:active { cursor: grabbing; }
+        
+        .warehouse-cube { width: 450px; height: 300px; position: relative; transform-style: preserve-3d; transform: rotateX(-25deg) rotateY(45deg); transition: transform 0.1s; }
+        .face { position: absolute; border: 2px solid rgba(102, 0, 51, 0.3); box-sizing: border-box; background: rgba(255, 255, 255, 0.02); }
+        
+        .front  { width: 450px; height: 300px; transform: translateZ(225px); border: 3px solid var(--guinda); }
+        .back   { width: 450px; height: 300px; transform: rotateY(180deg) translateZ(225px); }
+        .right  { width: 450px; height: 300px; transform: rotateY(90deg) translateZ(225px); }
+        .left   { width: 450px; height: 300px; transform: rotateY(-90deg) translateZ(225px); }
+        .top    { width: 450px; height: 450px; transform: rotateX(90deg) translateZ(225px); }
+        .bottom { width: 450px; height: 450px; transform: rotateX(-90deg) translateZ(75deg); background: rgba(0,0,0,0.08); border: 3px solid #000; }
+
+        .cortina { position: absolute; width: 110px; height: 200px; background: repeating-linear-gradient(90deg, #d2d2d2, #d2d2d2 8px, #888 8px, #888 16px); bottom: 0; border: 3px solid #000; opacity: 0.85; }
+        .cortina-1 { left: 60px; }
+        .cortina-2 { right: 60px; }
+
+        /* Estructuras 3D Reales */
+        .rack-3d { position: absolute; width: 40px; height: 230px; background: rgba(0, 0, 0, 0.05); border: 2px solid #d35400; transform-style: preserve-3d; top: 30px; }
+        .rack-3d-shelf { position: absolute; width: 100%; height: 6px; background: #ff9f43; border-bottom: 2px solid #000; }
+        
+        /* Pallets con Detalles de Cajas de Producto */
+        .pallet-3d { position: absolute; width: 34px; height: 34px; transform-style: preserve-3d; left: 3px; }
+        .p-face { 
+            position: absolute; width: 34px; height: 34px; border: 1px solid #3e1b07; box-sizing: border-box;
+            background-color: #8b4513;
+            /* Textura simulando cajas */
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 10px, rgba(0,0,0,0.3) 10px, rgba(0,0,0,0.3) 11px), 
+                              repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(0,0,0,0.3) 10px, rgba(0,0,0,0.3) 11px);
+        }
+        .p-front  { transform: translateZ(17px); }
+        .p-back   { transform: rotateY(180deg) translateZ(17px); }
+        .p-right  { transform: rotateY(90deg) translateZ(17px); }
+        .p-left   { transform: rotateY(-90deg) translateZ(17px); }
+        .p-top    { background-color: #a0522d; transform: rotateX(90deg) translateZ(17px); }
+        .p-bottom { transform: rotateX(-90deg) translateZ(17px); }
+
+        .pallet-cuarentena .p-face { background-color: #dc3545; }
+        .pallet-cuarentena .p-top { background-color: #e4606d; }
+
+        .floor-zone { position: absolute; border: 4px dashed #ff9f43; background: rgba(255, 159, 67, 0.05); transform-style: preserve-3d; }
+        .quarantine-zone { position: absolute; border: 4px dashed #dc3545; background: repeating-linear-gradient(45deg, rgba(220,53,69,0.1), rgba(220,53,69,0.1) 10px, transparent 10px, transparent 20px); transform-style: preserve-3d; }
+        
+        /* Cámara Fría Mejorada */
+        .camara-fria-box { 
+            position: absolute; width: 280px; height: 250px; 
+            border: 4px solid #007bff; background: rgba(0, 123, 255, 0.1); 
+            transform-style: preserve-3d; box-shadow: inset 0 0 20px rgba(0,123,255,0.3);
+            border-top: 10px solid #0056b3; 
+        }
+
+        #contenedorNodos3D { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-style: preserve-3d; pointer-events: none; }
+
+        .sensor-node { position: absolute; width: 22px; height: 22px; background: #28a745; border: 2px solid #fff; border-radius: 50%; font-size: 10px; color: #fff; display: flex; justify-content: center; align-items: center; font-weight: bold; box-shadow: 0 0 12px #000; z-index: 100; transition: transform 0.2s ease; }
+        .risk-medium { background: #ffc107; color: #000; }
+        .risk-high { background: #dc3545; }
+    </style>
+</head>
+<body>
+
+<div class="main-card">
+    <div style="text-align: center; margin-bottom: 25px;">
+        <h1 style="color: var(--guinda); margin:0; font-size: 1.7rem;">SEVAMETROLOGÍA v17.0</h1>
+        <p style="margin:5px 0 0; font-weight: bold; color: var(--negro);">Calificación Técnica: Topología Volumétrica Detallada y Expediente Normativo Oficial</p>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('sim-matriz')">1. Matriz AMEF Georreferenciada (Escala Metros)</button>
+        <button class="tab-btn" onclick="switchTab('sim-3d')">2. Inspección Visual de Planta 3D</button>
+    </div>
+
+    <div id="sim-matriz" class="tab-content active">
+        <h2>Bloque de Monitoreo Cartesiano</h2>
+        
+        <table id="tablaAmefDinamica">
+            <thead>
+                <tr>
+                    <th width="50">ID</th>
+                    <th width="320">Causa del Riesgo (Catálogo de Observaciones)</th>
+                    <th width="240">Coordenadas (X, Y, Z) en Metros (m)</th>
+                    <th width="45">S</th>
+                    <th width="45">O</th>
+                    <th width="45">D</th>
+                    <th width="50">NPR</th>
+                    <th>Estrategia de Mitigación</th>
+                    <th width="30">X</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpoAmef"></tbody>
+        </table>
+        
+        <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-add" onclick="agregarFilaSensor()">+ Añadir Datalogger Individual</button>
+            <button type="button" class="btn btn-auto" onclick="agregarSetSensores()">+ Auto-Mapeo (Cargar Set Completo de Zona)</button>
+        </div>
+
+        <div style="margin-top: 25px; background: white; padding: 20px; border-radius: 8px; border: 3px solid #000;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
+                <div><label>Cliente / Razón Social:</label><input type="text" id="p_cliente" value="CENTRO LOGÍSTICO (OPERADOR LOGÍSTICO)"></div>
+                <div><label>Área Evaluada:</label><input type="text" id="p_equipo" value="ALMACÉN GENERAL (ZONA RACKS)" disabled style="background:#e9ecef; color:#000;"></div>
+                <div style="grid-column: span 2;"><label>Objetivo Técnico del Protocolo:</label><textarea id="p_objetivo" rows="2" style="border: 2px solid #000;">Demostrar documentadamente que el área evaluada es capaz de mantener el gradiente térmico exigido, identificando puntos críticos de acuerdo a la NOM-059-SSA1 y el Reporte 961 de la OMS.</textarea></div>
+            </div>
+
+            <label>Conclusiones Finales e Informe:</label>
+            <textarea id="p_concl" rows="2" style="border: 2px solid #000;">El estudio evidencia control absoluto. La distribución espacial de la carga térmica no afecta el mantenimiento de las condiciones de almacenamiento reguladas en la red de frío.</textarea>
+            <label style="margin-top:10px;">Dictamen Oficial de Calificación:</label>
+            <select id="p_dictamen" style="border: 2px solid #000;">
+                <option value="ETAPA DE CALIFICACIÓN SATISFACTORIA">ETAPA DE CALIFICACIÓN SATISFACTORIA</option>
+                <option value="ETAPA DE CALIFICACIÓN NO SATISFACTORIA">ETAPA DE CALIFICACIÓN NO SATISFACTORIA</option>
+            </select>
+            <button type="button" class="btn btn-action" onclick="exportarExpedienteMaestroPDF()">GENERAR EXPEDIENTE OFICIAL PDF (INCLUYE PLANOS VECTORIALES Y ANEXOS)</button>
+        </div>
+    </div>
+
+    <div id="sim-3d" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--guinda); padding-bottom: 10px; margin-bottom: 15px;">
+            <h2 style="border: none; margin: 0; padding: 0;">Topología 3D Interactiva</h2>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="margin:0; font-size:0.9rem; font-weight:bold;">Visualizar Planta:</label>
+                <select id="layout-selector" onchange="cambiarTopologia3D()" style="width: auto; padding: 8px; background: var(--guinda); color: white; border: 2px solid #000; border-radius: 4px; font-weight:bold;">
+                    <option value="racks">Zona A: Racks de Alta Densidad</option>
+                    <option value="piso">Zona B: Producto Terminado (Nivel Piso)</option>
+                    <option value="cuarentena">Zona C: Área de Cuarentena y Rechazos</option>
+                    <option value="camarafria">Zona D: Cámara Fría (Interior Detallado)</option>
+                </select>
+            </div>
+        </div>
+
+        <p style="font-size:0.85rem; font-weight: bold; margin-bottom: 15px;">Arrastra con el mouse para rotar el almacén y comprobar la distribución volumétrica real.</p>
+        
+        <div class="canvas-3d" id="canvas">
+            <div class="warehouse-cube" id="cube">
+                <div class="face front"><div class="cortina cortina-1"></div><div class="cortina cortina-2"></div></div>
+                <div class="face back"></div><div class="face right"></div><div class="face left"></div><div class="face top"></div><div class="face bottom"></div>
+                
+                <div id="estructura3D"></div>
+                <div id="contenedorNodos3D"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const catalogoRiesgos = [
+        { c: "Infiltración térmica por apertura de andén", m: "Instalar cortinas automáticas y enclavamiento" },
+        { c: "Radiación directa en techo (Estacionalidad)", m: "Extractores axiales e instrumentar sensor redundante" },
+        { c: "Falla de inyección de aire forzado", m: "Planta de emergencia con switch de transferencia" },
+        { c: "Obstrucción de flujo por volumen de tarimas", m: "Delimitar distancias de seguridad (30 cm libres)" },
+        { c: "Acumulación de bolsas de aire frío", m: "Implementar ventiladores homogeneizadores" },
+        { c: "Zonas muertas tras racks estructurales", m: "Redistribuir diseño e instrumentar vértice posterior" }
+    ];
+
+    let sensoresData = [];
+    let contadorSensores = 0;
+
+    const cubeHTML = `<div class="p-face p-front"></div><div class="p-face p-back"></div><div class="p-face p-right"></div><div class="p-face p-left"></div><div class="p-face p-top"></div><div class="p-face p-bottom"></div>`;
+
+    function switchTab(id) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById(id).classList.add('active');
+        if(id === 'sim-3d') actualizarMaqueta3D();
+    }
+
+    // ROTACIÓN
+    const canvas = document.getElementById('canvas');
+    const cube = document.getElementById('cube');
+    let mDrag = false; let mPrev = { x: 0, y: 0 };
+    let rotX = -25, rotY = 45;
+    canvas.onmousedown = (e) => { mDrag = true; mPrev = { x: e.clientX, y: e.clientY }; };
+    document.onmousemove = (e) => { if (!mDrag) return; rotY += (e.clientX - mPrev.x) * 0.4; rotX -= (e.clientY - mPrev.y) * 0.4; cube.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`; mPrev = { x: e.clientX, y: e.clientY }; };
+    document.onmouseup = () => { mDrag = false; };
+
+    function cambiarTopologia3D() {
+        const selector = document.getElementById('layout-selector');
+        const tipo = selector.value;
+        const nombreZona = selector.options[selector.selectedIndex].text;
+        const cont = document.getElementById('estructura3D');
+        let html = '';
+
+        if (tipo === 'racks') {
+            html = `
+                <div class="rack-3d" style="transform: translate3d(40px, 0, 130px);"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div><div class="rack-3d-shelf" style="top:110px;"></div><div class="pallet-3d" style="top:116px;">${cubeHTML}</div></div>
+                <div class="rack-3d" style="transform: translate3d(40px, 0, 50px);"><div class="rack-3d-shelf" style="top:40px;"></div><div class="rack-3d-shelf" style="top:110px;"></div><div class="pallet-3d" style="top:116px;">${cubeHTML}</div></div>
+                <div class="rack-3d" style="transform: translate3d(40px, 0, -30px);"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div><div class="rack-3d-shelf" style="top:110px;"></div></div>
+                <div class="rack-3d" style="transform: translate3d(40px, 0, -110px);"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:116px;">${cubeHTML}</div></div>
+                <div class="rack-3d" style="transform: translate3d(370px, 0, 130px);"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div><div class="rack-3d-shelf" style="top:110px;"></div></div>
+                <div class="rack-3d" style="transform: translate3d(370px, 0, 50px);"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:116px;">${cubeHTML}</div></div>
+                <div class="rack-3d" style="transform: translate3d(370px, 0, -30px);"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div></div>
+                <div class="rack-3d" style="transform: translate3d(370px, 0, -110px);"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:116px;">${cubeHTML}</div></div>
+            `;
+        } else if (tipo === 'piso') {
+            html = `<div class="floor-zone" style="width: 150px; height: 180px; transform: translate3d(30px, 260px, -60px) rotateX(-90deg);"></div>
+                    <div class="floor-zone" style="width: 150px; height: 180px; transform: translate3d(270px, 260px, -60px) rotateX(-90deg);"></div>
+                    <div class="pallet-3d" style="transform: translate3d(50px, 255px, 60px);">${cubeHTML}</div><div class="pallet-3d" style="transform: translate3d(90px, 255px, 60px);">${cubeHTML}</div>
+                    <div class="pallet-3d" style="transform: translate3d(290px, 255px, 80px);">${cubeHTML}</div><div class="pallet-3d" style="transform: translate3d(330px, 255px, 80px);">${cubeHTML}</div>`;
+        } else if (tipo === 'cuarentena') {
+            html = `<div class="quarantine-zone" style="width: 250px; height: 150px; transform: translate3d(100px, 260px, -20px) rotateX(-90deg);"></div>
+                    <div class="pallet-3d pallet-cuarentena" style="transform: translate3d(120px, 255px, 100px);">${cubeHTML}</div>
+                    <div class="pallet-3d pallet-cuarentena" style="transform: translate3d(160px, 255px, 100px);">${cubeHTML}</div>`;
+        } else if (tipo === 'camarafria') {
+            // Estructura robusta y detallada de cámara fría con racks internos y productos
+            html = `
+                <div class="camara-fria-box" style="transform: translate3d(100px, 50px, -20px);">
+                    <div class="rack-3d" style="transform: translate3d(15px, 0, 15px); height:190px;"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div><div class="rack-3d-shelf" style="top:120px;"></div><div class="pallet-3d" style="top:126px;">${cubeHTML}</div></div>
+                    <div class="rack-3d" style="transform: translate3d(115px, 0, 15px); height:190px;"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div><div class="rack-3d-shelf" style="top:120px;"></div></div>
+                    <div class="rack-3d" style="transform: translate3d(215px, 0, 15px); height:190px;"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div><div class="rack-3d-shelf" style="top:120px;"></div><div class="pallet-3d" style="top:126px;">${cubeHTML}</div></div>
+                    
+                    <div class="rack-3d" style="transform: translate3d(15px, 0, 120px); height:190px;"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div></div>
+                    <div class="rack-3d" style="transform: translate3d(215px, 0, 120px); height:190px;"><div class="rack-3d-shelf" style="top:40px;"></div><div class="pallet-3d" style="top:46px;">${cubeHTML}</div></div>
+                </div>
+            `;
+        }
+        
+        cont.innerHTML = html;
+        document.getElementById('p_equipo').value = nombreZona;
+        document.getElementById('cuerpoAmef').innerHTML = "";
+        sensoresData = []; contadorSensores = 0;
+        actualizarMaqueta3D();
+    }
+
+    function agregarFilaSensor() {
+        contadorSensores++; const id = contadorSensores;
+        const tbody = document.getElementById('cuerpoAmef');
+        const tr = document.createElement('tr');
+        tr.id = `fila-${id}`;
+        
+        let opciones = catalogoRiesgos.map((r, idx) => `<option value="${idx}">${r.c}</option>`).join('');
+
+        tr.innerHTML = `
+            <td><b>S${id}</b></td>
+            <td><select id="sel-riesgo-${id}" onchange="guardarEstado(${id})">${opciones}</select></td>
+            <td>
+                <div style="font-weight: bold; text-align: left;">
+                    X: <input type="number" step="0.5" class="coord-input" value="22.5" id="x-${id}" onchange="guardarEstado(${id})">
+                    Y: <input type="number" step="0.5" class="coord-input" value="15.0" id="y-${id}" onchange="guardarEstado(${id})">
+                    Z: <input type="number" step="0.5" class="coord-input" value="0.0" id="z-${id}" onchange="guardarEstado(${id})">
+                </div>
+            </td>
+            <td><input type="number" value="2" min="1" max="5" id="s-${id}" onchange="guardarEstado(${id})"></td>
+            <td><input type="number" value="2" min="1" max="5" id="o-${id}" onchange="guardarEstado(${id})"></td>
+            <td><input type="number" value="2" min="1" max="5" id="d-${id}" onchange="guardarEstado(${id})"></td>
+            <td id="npr-${id}" style="font-weight:bold; text-align:center; background:#d4edda; font-size:1.1rem; border:2px solid #000;">8</td>
+            <td><input type="text" id="mitig-${id}" value="${catalogoRiesgos[0].m}" disabled style="background:#e9ecef; color:#000;"></td>
+            <td><button type="button" class="btn" style="background:#dc3545; color:white; border:2px solid #000;" onclick="eliminarFila(${id})">X</button></td>
+        `;
+        tbody.appendChild(tr); guardarEstado(id); return id;
+    }
+
+    function agregarSetSensores() {
+        const zona = document.getElementById('layout-selector').value;
+        let coords = [];
+        
+        if (zona === 'racks') {
+            coords = [{x: 5.0, y: 3.0, z: -10.0, s:4}, {x: 40.0, y: 3.0, z: -10.0, s:4}, {x: 5.0, y: 3.0, z: 12.0, s:2}, {x: 40.0, y: 3.0, z: 12.0, s:2}, {x: 5.0, y: 25.0, z: -10.0, s:3}, {x: 40.0, y: 25.0, z: -10.0, s:3}, {x: 5.0, y: 25.0, z: 12.0, s:5}, {x: 40.0, y: 25.0, z: 12.0, s:5}, {x: 22.5, y: 15.0, z: 1.0, s:2}];
+        } else if (zona === 'piso') {
+            coords = [{x: 6.0, y: 25.0, z: -4.0, s:2}, {x: 39.0, y: 25.0, z: -4.0, s:2}, {x: 6.0, y: 25.0, z: 9.0, s:4}, {x: 39.0, y: 25.0, z: 9.0, s:4}, {x: 22.5, y: 25.0, z: 2.5, s:2}];
+        } else if (zona === 'cuarentena') {
+            coords = [{x: 12.0, y: 25.0, z: -1.0, s:3}, {x: 33.0, y: 25.0, z: -1.0, s:3}, {x: 12.0, y: 25.0, z: 11.0, s:3}, {x: 33.0, y: 25.0, z: 11.0, s:3}];
+        } else if (zona === 'camarafria') {
+            coords = [{x: 11.0, y: 9.0, z: -1.0, s:4}, {x: 34.0, y: 9.0, z: -1.0, s:4}, {x: 11.0, y: 9.0, z: 14.0, s:2}, {x: 34.0, y: 9.0, z: 14.0, s:2}, {x: 11.0, y: 23.0, z: -1.0, s:3}, {x: 34.0, y: 23.0, z: -1.0, s:3}, {x: 11.0, y: 23.0, z: 14.0, s:2}, {x: 34.0, y: 23.0, z: 14.0, s:2}];
+        }
+
+        coords.forEach(c => {
+            let id = agregarFilaSensor();
+            document.getElementById(`x-${id}`).value = c.x.toFixed(1); document.getElementById(`y-${id}`).value = c.y.toFixed(1); document.getElementById(`z-${id}`).value = c.z.toFixed(1);
+            document.getElementById(`s-${id}`).value = c.s;
+            guardarEstado(id);
+        });
+        switchTab('sim-3d');
+    }
+
+    function guardarEstado(id) {
+        const x = parseFloat(document.getElementById(`x-${id}`).value) || 0;
+        const y = parseFloat(document.getElementById(`y-${id}`).value) || 0;
+        const z = parseFloat(document.getElementById(`z-${id}`).value) || 0;
+        const s = document.getElementById(`s-${id}`).value;
+        const o = document.getElementById(`o-${id}`).value;
+        const d = document.getElementById(`d-${id}`).value;
+        const npr = s * o * d;
+
+        const tdNpr = document.getElementById(`npr-${id}`);
+        tdNpr.innerText = npr;
+
+        let claseRiesgo = "sensor-node";
+        if(npr >= 28) { tdNpr.style.backgroundColor = "#f8d7da"; claseRiesgo = "sensor-node risk-high"; }
+        else if(npr >= 13) { tdNpr.style.backgroundColor = "#fff3cd"; claseRiesgo = "sensor-node risk-medium"; }
+        else { tdNpr.style.backgroundColor = "#d4edda"; }
+
+        const selIdx = document.getElementById(`sel-riesgo-${id}`).value;
+        document.getElementById(`mitig-${id}`).value = catalogoRiesgos[selIdx].m;
+
+        const idx = sensoresData.findIndex(item => item.id === id);
+        const dataObj = { id, x, y, z, npr, claseRiesgo, causa: catalogoRiesgos[selIdx].c, mitig: catalogoRiesgos[selIdx].m };
+        if(idx > -1) sensoresData[idx] = dataObj; else sensoresData.push(dataObj);
+        
+        if(document.getElementById('sim-3d').classList.contains('active')) actualizarMaqueta3D();
+    }
+
+    function eliminarFila(id) { document.getElementById(`fila-${id}`).remove(); sensoresData = sensoresData.filter(item => item.id !== id); actualizarMaqueta3D(); }
+
+    function actualizarMaqueta3D() {
+        const contenedor = document.getElementById('contenedorNodos3D');
+        contenedor.innerHTML = "";
+        sensoresData.forEach(s => {
+            const node = document.createElement('div');
+            node.className = s.claseRiesgo; node.innerText = `S${s.id}`;
+            // Mapeo métrico (1 metro = 10 pixeles en el canvas 3D)
+            node.style.transform = `translate3d(${s.x * 10}px, ${s.y * 10}px, ${s.z * 10}px)`;
+            contenedor.appendChild(node);
+        });
+    }
+
+    window.onload = () => { cambiarTopologia3D(); };
+
+    // =========================================================================
+    // EXPORTACIÓN PDF DEFINITIVA - GARANTÍA DE PLOTEO VECTORIAL Y TRAZOS GRUESOS
+    // =========================================================================
+    async function exportarExpedienteMaestroPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pw = 210; const guinda = [102, 0, 51]; const negro = [0, 0, 0];
+
+        doc.setLineWidth(1.0); doc.setDrawColor(0, 0, 0); 
+
+        const ftr = (p) => { 
+            doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0); 
+            doc.text(`SEVAMETROLOGIA 2026, Calle 54 C, Col. Antonio Alzate, Nezahualcoyotl, 57188, Estado de México.`, pw/2, 285, {align:'center'});
+            doc.text(`Página ${p} de 10`, pw/2, 290, {align:'center'}); 
+        };
+
+        // P1: Portada Oficial
+        doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.setTextColor(0,0,0); doc.setFontSize(22); doc.setFont(undefined, 'bold');
+        doc.text("EXPEDIENTE MAESTRO DE CALIFICACIÓN TÉRMICA", pw/2, 60, {align:'center'});
+        doc.setFontSize(14); doc.text(`CLIENTE: ${document.getElementById('p_cliente').value}`, pw/2, 90, {align:'center'}); doc.text(`ÁREA / ZONA EVALUADA: ${document.getElementById('p_equipo').value}`, pw/2, 100, {align:'center'});
+        doc.rect(20, 130, 170, 30, 'S'); doc.text("DOCUMENTO OFICIAL DE AUDITORÍA (NOM-059)", pw/2, 147, {align:'center'}); ftr(1);
+
+        // P2: Objetivo, P3: Índice, P4: Responsabilidades
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.setFontSize(16); doc.text("1. OBJETIVO TÉCNICO Y ALCANCE", 20, 50); doc.setFontSize(11); doc.setFont(undefined, 'normal'); doc.text(doc.splitTextToSize(document.getElementById('p_objetivo').value, 170), 20, 65); ftr(2);
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.text("2. ÍNDICE DE CUMPLIMIENTO", 20, 50); doc.setFontSize(12); doc.setFont(undefined, 'normal'); ["1. Objetivo y Alcance", "2. Índice", "3. Responsabilidades de Ejecución", "4. Matriz de Riesgos y Georreferenciación", "5. Plano Vectorial y Distribución Volumétrica", "6. Anexo I: Certificados de Calibración", "7. Anexo II: Datos Crudos y Gráficos (CFR 21)", "8. Anexo III: Evidencia Fotográfica", "9. Dictamen Final y Firmas"].forEach((t, i) => { doc.text(t, 25, 70+(i*12)); doc.text(`Pág. ${i+2}`, pw-35, 70+(i*12), {align:'right'}); }); ftr(3);
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.text("3. MATRIZ DE RESPONSABILIDADES", 20, 50); doc.setFontSize(12); doc.text("SEVAM METROLOGÍA: Diseño de protocolo y georreferenciación.", 25, 70); doc.text("ASEGURAMIENTO DE CALIDAD: Aprobación de criterios y dictamen final.", 25, 90); doc.text("INGENIERÍA Y MANTENIMIENTO: Soporte operativo y mitigaciones.", 25, 110); ftr(4);
+
+        // P5: MATRIZ
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.text("4. MATRIZ AMEF Y COORDENADAS (METROS)", 20, 45);
+        const renglonesPdf = sensoresData.map(s => [`S${s.id}`, s.causa, `X:${s.x}m\nY:${s.y}m\nZ:${s.z}m`, s.npr, s.mitig]);
+        doc.autoTable({ startY: 55, theme: 'grid', head: [['ID', 'Causa Regulatoria', 'Coord (m)', 'NPR', 'Mitigación']], body: renglonesPdf, styles: { textColor: [0,0,0], fontStyle: 'bold', lineColor: [0,0,0], lineWidth: 0.6 }, headStyles: { fillColor: guinda, textColor: 255, lineWidth: 0.6, lineColor: [0,0,0] } });
+        ftr(5);
+
+        // P6: PLOTEO VECTORIAL SÓLIDO (GARANTIZADO CON 'DF')
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.text("5. PLANO VECTORIAL DE PLANTA (VISTA SUPERIOR)", 20, 45);
+        doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.text(`Zona Modelada a Escala: ${document.getElementById('p_equipo').value}`, 20, 52);
+        
+        doc.setLineWidth(1.2); doc.setDrawColor(0, 0, 0); 
+        doc.setFillColor(245, 245, 245); doc.rect(20, 65, 170, 150, 'DF'); // Muros base siempre visibles
+        
+        const tipoZona = document.getElementById('layout-selector').value; doc.setLineWidth(0.6);
+
+        // DIBUJAR VOLUMETRÍA EN PDF
+        if (tipoZona === 'racks') { 
+            doc.setFillColor(230, 126, 34); doc.rect(30, 75, 15, 50, 'DF'); doc.rect(30, 145, 15, 50, 'DF'); doc.rect(165, 75, 15, 50, 'DF'); doc.rect(165, 145, 15, 50, 'DF');
+            doc.setFillColor(139, 69, 19); doc.rect(32, 80, 11, 15, 'DF'); doc.rect(167, 150, 11, 15, 'DF'); // Simulando pallets vistos desde arriba
+        }
+        else if (tipoZona === 'piso') { doc.setFillColor(255, 159, 67); doc.rect(40, 80, 50, 60, 'DF'); doc.rect(120, 80, 50, 60, 'DF'); }
+        else if (tipoZona === 'cuarentena') { doc.setFillColor(220, 53, 69); doc.rect(60, 90, 90, 80, 'DF'); doc.setTextColor(255,255,255); doc.text("ZONA CUARENTENA", 85, 130); doc.setTextColor(0,0,0); }
+        else if (tipoZona === 'camarafria') { 
+            doc.setFillColor(200, 220, 255); doc.rect(50, 80, 110, 100, 'DF'); // Cuarto
+            doc.setFillColor(230, 126, 34); doc.rect(60, 90, 15, 80, 'DF'); doc.rect(130, 90, 15, 80, 'DF'); // Racks internos
+        }
+
+        doc.setFillColor(150, 150, 150); doc.rect(50, 215, 30, 6, 'DF'); doc.rect(130, 215, 30, 6, 'DF'); doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.text("ANDENES FRONTALES / ACCESO", 105, 230, {align:'center'});
+
+        // MAPEADO MATEMÁTICO DE SENSORES EN EL PDF (Escala 45m x 30m)
+        sensoresData.forEach(s => {
+            let plotX = 20 + (parseFloat(s.x) / 45) * 170; 
+            let plotZ = 65 + ((parseFloat(s.z) + 15) / 30) * 150;
+            if(plotX < 25) plotX = 25; if(plotX > 185) plotX = 185; if(plotZ < 70) plotZ = 70; if(plotZ > 210) plotZ = 210;
+            
+            if(s.npr >= 28) doc.setFillColor(220, 53, 69); else if(s.npr >= 13) doc.setFillColor(255, 193, 7); else doc.setFillColor(40, 167, 69);
+            doc.setDrawColor(0,0,0); doc.circle(plotX, plotZ, 4, 'DF'); doc.setTextColor(255); doc.setFontSize(9); doc.text(`S${s.id}`, plotX, plotZ + 1.5, {align: 'center'}); doc.setTextColor(0,0,0);
+        });
+        ftr(6);
+
+        // P7, P8, P9: Anexos
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.text("6. ANEXO I: CERTIFICADOS DE CALIBRACIÓN", 20, 50); ftr(7);
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.text("7. ANEXO II: DATOS CRUDOS (CFR 21 PARTE 11)", 20, 50); ftr(8);
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F'); doc.text("8. ANEXO III: EVIDENCIA FOTOGRÁFICA", 20, 50); ftr(9);
+
+        // P10: Conclusiones
+        doc.addPage(); doc.setFillColor(102, 0, 51); doc.rect(0, 0, pw, 25, 'F');
+        doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.text("9. DICTAMEN FINAL Y CIERRE", 20, 50);
+        doc.setFontSize(12); doc.setFont(undefined, 'normal'); doc.text(doc.splitTextToSize(document.getElementById('p_concl').value, 170), 20, 60);
+        doc.setFillColor(245); doc.rect(20, 90, 170, 30, 'DF'); doc.setFontSize(14); doc.setFont(undefined, 'bold'); doc.text(document.getElementById('p_dictamen').value, pw/2, 108, {align:'center'});
+        
+        doc.line(pw/2-50, 200, pw/2+50, 200, 'S'); doc.text("Ricardo Fabián Durán Valencia", pw/2, 208, {align:'center'}); doc.setFont(undefined, 'normal'); doc.text("Director Consultoría y Capacitación - SEVAM", pw/2, 215, {align:'center'});
+        ftr(10);
+
+        doc.save("Reporte_Calificacion_Auditoria_SEVAM.pdf");
+    }
+</script>
+</body>
+</html>

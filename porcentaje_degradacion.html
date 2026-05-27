@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Perfiles de Degradación y Estabilidad Cinética</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #722f37;
+            --primary-dark: #511f25;
+            --accent-color: #a84350;
+            --bg-light: #fdfbfb;
+            --text-main: #2b2b2b;
+            --border-color: #e0d8d8;
+            --success-color: #2e7d32;
+            --danger-color: #c62828;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body { background-color: #faf6f6; color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; }
+
+        header { background-color: var(--primary-color); color: white; padding: 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        header h1 { font-size: 22px; font-weight: 600; letter-spacing: 0.5px; }
+        header p { font-size: 13px; margin-top: 5px; opacity: 0.9; }
+
+        .container { display: flex; flex: 1; padding: 20px; gap: 20px; max-width: 1600px; width: 100%; margin: 0 auto; }
+
+        .sidebar { width: 320px; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 15px; }
+
+        .section-title { font-size: 15px; color: var(--primary-color); border-left: 4px solid var(--primary-color); padding-left: 8px; font-weight: 600; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 12px; font-weight: 600; color: #555; }
+        input, select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 13px; outline: none; transition: border 0.2s; }
+        input:focus, select:focus { border-color: var(--primary-color); }
+
+        .time-fix-box { background-color: #fff5f5; border: 1px solid var(--accent-color); border-radius: 6px; padding: 12px; }
+        .time-fix-box label.title { color: var(--primary-color); }
+
+        button { background-color: var(--primary-color); color: white; border: none; padding: 10px 15px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button:hover { background-color: var(--primary-dark); }
+        button.btn-secondary { background-color: #6c757d; }
+        button.btn-secondary:hover { background-color: #5a6268; }
+
+        .file-upload-box { border: 2px dashed var(--accent-color); padding: 15px; text-align: center; border-radius: 6px; background-color: #fff8f8; cursor: pointer; transition: background 0.2s; }
+        .file-upload-box:hover { background-color: #fcedef; }
+
+        .main-panel { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
+        .card { background: white; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: center; }
+        .card-label { font-size: 11px; text-transform: uppercase; color: #777; font-weight: 600; margin-bottom: 5px; }
+        .card-value { font-size: 20px; font-weight: 700; color: var(--primary-color); }
+
+        .status-banner { padding: 15px; border-radius: 8px; font-weight: 700; font-size: 16px; text-align: center; display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .status-pass { background-color: #e8f5e9; color: var(--success-color); border: 1px solid #c8e6c9; }
+        .status-fail { background-color: #ffebee; color: var(--danger-color); border: 1px solid #ffcdd2; }
+
+        .info-panel { background-color: #f8f9fa; border-left: 4px solid var(--primary-color); padding: 15px; border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
+        .info-panel ol { margin-left: 20px; margin-top: 10px; }
+        .info-panel li { margin-bottom: 8px; }
+        .info-panel code { background-color: #e9ecef; padding: 2px 5px; border-radius: 3px; color: var(--primary-dark); font-weight: 600; display: inline-block; margin-top: 3px; }
+
+        .report-section { background: white; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); page-break-inside: avoid; }
+        .chart-container { position: relative; height: 350px; width: 100%; margin-bottom: 20px; }
+
+        .signature-block { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 25px; padding-top: 20px; border-top: 1px dashed var(--border-color); page-break-inside: avoid; }
+        .signature-space { text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .signature-line { width: 80%; border-bottom: 1px solid #777; margin-top: 40px; margin-bottom: 5px; }
+        .signature-title { font-size: 11px; color: #555; font-weight: 600; }
+
+        .table-container { max-height: 350px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
+        th { background-color: var(--primary-color); color: white; padding: 10px; position: sticky; top: 0; font-weight: 600; z-index: 1; }
+        td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+        tr:nth-child(even) { background-color: #fcf9f9; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Simulador Avanzado de Perfiles de Degradación y Reglas de Decisión</h1>
+        <p>Evaluación Cinética de Excursiones Térmicas basada en la Ecuación de Arrhenius • Cumplimiento Normativo</p>
+    </header>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="section-title">Parámetros de Cinética</div>
+            <div class="form-group">
+                <label>Energía de Activación (Ea - kJ/mol):</label>
+                <input type="number" id="eaInput" value="83.14" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Temp. Referencia / Almacenamiento (°C):</label>
+                <input type="number" id="tRefInput" value="5.0" step="0.1">
+            </div>
+            <div class="form-group">
+                <label>Vida Útil Base a T-Ref (Meses):</label>
+                <input type="number" id="shelfLifeInput" value="24" step="1">
+            </div>
+
+            <div class="section-title">Reglas de Decisión</div>
+            <div class="form-group">
+                <label>Degradación Máxima Permitida (%):</label>
+                <input type="number" id="maxDegInput" value="5.0" step="0.1">
+            </div>
+            <div class="form-group">
+                <label>Incertidumbre Expandida del Canal (°C):</label>
+                <input type="number" id="uncertaintyInput" value="0.5" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Regla de Aceptación:</label>
+                <select id="ruleSelect">
+                    <option value="strict">Conservadora (Degradación + Incertidumbre)</option>
+                    <option value="simple">Directa (Degradación Directa)</option>
+                </select>
+            </div>
+
+            <div class="section-title">Parámetros de Tiempo (Datalogger)</div>
+            <div class="form-group time-fix-box">
+                <label class="title">Intervalo de Muestreo (Minutos):</label>
+                <input type="number" id="intervalInput" value="15" step="1">
+                <label style="display:flex; align-items:center; gap:5px; margin-top:8px; font-weight:normal; font-size:11px; cursor:pointer;">
+                    <input type="checkbox" id="useFixedInterval" checked>
+                    Forzar intervalo (Corrige errores de Fecha/Hora en CSV)
+                </label>
+            </div>
+
+            <div class="section-title">Carga de Datos</div>
+            <div class="file-upload-box" onclick="document.getElementById('csvFileInput').click()">
+                <p style="font-size: 13px; font-weight: 600; color: var(--primary-color);">Seleccionar Archivo CSV</p>
+                <p style="font-size: 11px; color: #666; margin-top:4px;">Columnas: Fecha/Hora, Temp (°C)</p>
+                <input type="file" id="csvFileInput" accept=".csv" style="display:none;" onchange="handleFileSelect(event)">
+            </div>
+
+            <button class="btn-secondary" onclick="loadExampleData()">Cargar Datos de Ejemplo</button>
+            <button onclick="exportToPDF()">Descargar Reporte PDF</button>
+        </div>
+
+        <div class="main-panel" id="mainPanelContent">
+            <div id="statusBanner" class="status-banner"></div>
+
+            <div class="metrics-grid">
+                <div class="card"><div class="card-label">Duración de la Excursión</div><div class="card-value" id="metricDuration">0.0 h</div></div>
+                <div class="card"><div class="card-label">Temperatura Mín / Máx</div><div class="card-value" id="metricTempRange">0.0 / 0.0 °C</div></div>
+                <div class="card"><div class="card-label">Temp. Cinética Media (MKT)</div><div class="card-value" id="metricMKT">0.0 °C</div></div>
+                <div class="card"><div class="card-label">Degradación Acumulada</div><div class="card-value" id="metricDegradation">0.000 %</div></div>
+            </div>
+
+            <div class="info-panel no-print">
+                <div class="section-title" style="border-left-color: #555; color: #333;">¿Cómo se calcula el % de Degradación Acumulada?</div>
+                <p>El simulador determina la pérdida de vida útil basándose en la <strong>Ecuación de Arrhenius</strong>:</p>
+                <ol>
+                    <li><strong>Determinación de Tasa Base:</strong> <code>(Degradación Máxima %) / (Vida Útil en horas)</code></li>
+                    <li><strong>Factor de Aceleración (FA):</strong> <code>e^[ (Ea / R) × (1/T_ref - 1/T_real) ]</code></li>
+                    <li><strong>Degradación por Intervalo (Δt):</strong> <code>Tasa Base × FA × Δt (horas)</code></li>
+                    <li><strong>Degradación Acumulada:</strong> Sumatoria continua de todos los intervalos.</li>
+                </ol>
+            </div>
+
+            <div class="report-section">
+                <div class="section-title">Perfil Térmico y de Degradación Temporal</div>
+                <div class="chart-container"><canvas id="profileChart"></canvas></div>
+
+                <div class="signature-block">
+                    <div class="signature-space"><div class="signature-line"></div><div class="signature-title">Evaluado Por: Responsable Sanitario / Aseguramiento de Calidad</div></div>
+                    <div class="signature-space"><div class="signature-line"></div><div class="signature-title">Autorizado Por: Dirección Técnica / Operaciones</div></div>
+                </div>
+            </div>
+
+            <div class="report-section">
+                <div class="section-title">Desglose Analítico por Intervalo de Tiempo</div>
+                <div class="table-container">
+                    <table id="analyticsTable">
+                        <thead>
+                            <tr>
+                                <th>Lectura #</th>
+                                <th>Marca de Datalogger</th>
+                                <th>Tiempo Transcurrido (h)</th>
+                                <th>T. Real (°C)</th>
+                                <th>T. Eval (°C)</th>
+                                <th>Factor Arrhenius</th>
+                                <th>Deg. Intervalo (%)</th>
+                                <th>Deg. Acumulada (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="8" style="text-align:center; color:#888; padding:20px;">Cargue un archivo CSV para visualizar.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let myChart = null;
+        const R = 0.0083144626;
+
+        // Variables globales para permitir recalcular sin subir de nuevo el archivo
+        let globalRawTimeLabels = [];
+        let globalTempPoints = [];
+
+        // Inicializar el gráfico con posibilidad de agregar la línea de tolerancia
+        function initChart(labels = [], tempPoints = [], degPoints = [], maxDegVal = null) {
+            const ctx = document.getElementById('profileChart').getContext('2d');
+            if (myChart) myChart.destroy();
+
+            let datasets = [
+                { label: 'Temperatura Real (°C)', data: tempPoints, borderColor: '#722f37', backgroundColor: 'rgba(114, 47, 55, 0.1)', borderWidth: 2, yAxisID: 'yTemp', tension: 0.1, pointRadius: labels.length > 80 ? 0 : 2 },
+                { label: 'Degradación Acumulada (%)', data: degPoints, borderColor: '#a84350', borderDash: [5, 5], borderWidth: 2, yAxisID: 'yDeg', tension: 0.1, pointRadius: labels.length > 80 ? 0 : 2 }
+            ];
+
+            // Si hay un límite definido, dibujarlo como una línea recta roja punteada
+            if (maxDegVal !== null && labels.length > 0) {
+                datasets.push({
+                    label: 'Límite de Tolerancia (%)',
+                    data: Array(labels.length).fill(maxDegVal),
+                    borderColor: 'rgba(255, 0, 0, 0.6)',
+                    borderDash: [10, 5],
+                    borderWidth: 2,
+                    yAxisID: 'yDeg',
+                    pointRadius: 0,
+                    fill: false
+                });
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Tiempo Transcurrido (Horas)', font: { size: 12, weight: 'bold' } } },
+                        yTemp: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Temperatura (°C)', font: { size: 12, weight: 'bold', color: '#722f37' } } },
+                        yDeg: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Degradación Acumulada (%)', font: { size: 12, weight: 'bold', color: '#a84350' } }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        // Agregar Listeners para auto-actualización
+        document.querySelectorAll('.sidebar input, .sidebar select').forEach(element => {
+            element.addEventListener('input', recalculateData);
+            element.addEventListener('change', recalculateData);
+        });
+
+        function loadExampleData() {
+            document.getElementById('useFixedInterval').checked = true;
+            document.getElementById('intervalInput').value = "15"; 
+            
+            let csvText = "FechaHora,Temperatura\n";
+            for (let t = 0; t <= 48; t += 0.25) {
+                let temp = 5.0;
+                if (t >= 10 && t <= 24) temp = 5.0 + (t - 10) * (17 / 14);
+                else if (t > 24 && t <= 36) temp = 22.0 - (t - 24) * (17 / 12);
+                temp += (Math.random() - 0.5) * 0.4;
+                csvText += `2026-05-15 10:00:00,${temp.toFixed(2)}\n`;
+            }
+            processCSV(csvText);
+        }
+
+        function handleFileSelect(evt) {
+            const file = evt.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) { processCSV(e.target.result); };
+            reader.readAsText(file);
+        }
+
+        function processCSV(text) {
+            const lines = text.split(/\r?\n/);
+            globalRawTimeLabels = [];
+            globalTempPoints = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                let separator = lines[i].includes(';') ? ';' : ',';
+                let parts = lines[i].split(separator);
+                
+                if (parts.length >= 2) {
+                    let tempRaw = parts[parts.length - 1].replace(/['"]/g, '').replace(',', '.');
+                    let temp = parseFloat(tempRaw);
+                    if (!isNaN(temp)) {
+                        globalRawTimeLabels.push(parts[0].replace(/['"]/g, ''));
+                        globalTempPoints.push(temp);
+                    }
+                }
+            }
+
+            if (globalTempPoints.length < 2) {
+                alert("Error: No se encontraron datos numéricos de temperatura válidos.");
+                return;
+            }
+
+            recalculateData(); // Llama al recálculo
+        }
+
+        function recalculateData() {
+            if (globalTempPoints.length === 0) return; // Si no hay datos cargados, no hacer nada.
+
+            const Ea = parseFloat(document.getElementById('eaInput').value) || 0;
+            const tRef = parseFloat(document.getElementById('tRefInput').value) || 0;
+            const shelfLifeMonths = parseFloat(document.getElementById('shelfLifeInput').value) || 1;
+            const maxDegAllowed = parseFloat(document.getElementById('maxDegInput').value) || 0;
+            const uncertainty = parseFloat(document.getElementById('uncertaintyInput').value) || 0;
+            const decisionRule = document.getElementById('ruleSelect').value;
+            const useFixedInterval = document.getElementById('useFixedInterval').checked;
+            const intervalHours = (parseFloat(document.getElementById('intervalInput').value) || 15) / 60;
+
+            const T_ref_K = tRef + 273.15;
+            const totalShelfLifeHours = shelfLifeMonths * 30.4375 * 24; 
+            const baseK = maxDegAllowed / totalShelfLifeHours; 
+
+            let cumulativeDegradation = 0;
+            let cumulativeTime = 0;
+            let mktSum = 0;
+            let minTemp = Math.min(...globalTempPoints);
+            let maxTemp = Math.max(...globalTempPoints);
+
+            let elapsedTimeArray = [];
+            let degPointsArray = [];
+
+            const tbody = document.getElementById('analyticsTable').querySelector('tbody');
+            tbody.innerHTML = '';
+
+            for (let i = 0; i < globalTempPoints.length; i++) {
+                let currentT = globalTempPoints[i];
+                let evaluatedT = (decisionRule === 'strict') ? (currentT + uncertainty) : currentT;
+                let T_kelvin = currentT + 273.15;
+                let T_evaluated_kelvin = evaluatedT + 273.15;
+
+                let dt = 0;
+                if (i > 0) {
+                    if (useFixedInterval) {
+                        dt = intervalHours;
+                    } else {
+                        let t1 = parseFloat(globalRawTimeLabels[i-1].replace(',', '.'));
+                        let t2 = parseFloat(globalRawTimeLabels[i].replace(',', '.'));
+                        if (!isNaN(t1) && !isNaN(t2)) {
+                            dt = t2 - t1;
+                        } else {
+                            dt = intervalHours; 
+                        }
+                    }
+                }
+                
+                cumulativeTime += dt;
+                elapsedTimeArray.push(cumulativeTime.toFixed(2));
+
+                mktSum += Math.exp(-Ea / (R * T_kelvin));
+
+                let accelerationFactor = Math.exp((Ea / R) * ((1 / T_ref_K) - (1 / T_evaluated_kelvin)));
+                let intervalDeg = baseK * accelerationFactor * dt;
+                cumulativeDegradation += intervalDeg;
+                degPointsArray.push(cumulativeDegradation);
+
+                let row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="color:#888;">#${i+1}</td>
+                    <td style="font-size:11px;">${globalRawTimeLabels[i]}</td>
+                    <td style="font-weight:bold;">${cumulativeTime.toFixed(2)} h</td>
+                    <td>${currentT.toFixed(2)} °C</td>
+                    <td>${evaluatedT.toFixed(2)} °C</td>
+                    <td>${accelerationFactor.toFixed(3)} x</td>
+                    <td>${intervalDeg.toFixed(5)} %</td>
+                    <td style="font-weight:600; color:var(--primary-color);">${cumulativeDegradation.toFixed(4)} %</td>
+                `;
+                tbody.appendChild(row);
+            }
+
+            let mkt = (-Ea / R) / Math.log(mktSum / globalTempPoints.length);
+            let mktCelsius = mkt - 273.15;
+
+            document.getElementById('metricDuration').innerText = `${cumulativeTime.toFixed(1)} h`;
+            document.getElementById('metricTempRange').innerText = `${minTemp.toFixed(1)} / ${maxTemp.toFixed(1)} °C`;
+            document.getElementById('metricMKT').innerText = `${mktCelsius.toFixed(2)} °C`;
+            document.getElementById('metricDegradation').innerText = `${cumulativeDegradation.toFixed(4)} %`;
+
+            const statusBanner = document.getElementById('statusBanner');
+            statusBanner.style.display = 'block';
+            
+            if (cumulativeDegradation <= maxDegAllowed) {
+                statusBanner.innerText = `DICTAMEN: CONFORME • La degradación (${cumulativeDegradation.toFixed(4)}%) no supera el límite de ${maxDegAllowed.toFixed(1)}%.`;
+                statusBanner.className = "status-banner status-pass";
+            } else {
+                statusBanner.innerText = `DICTAMEN: NO CONFORME • La degradación (${cumulativeDegradation.toFixed(4)}%) excede la tolerancia de ${maxDegAllowed.toFixed(1)}%.`;
+                statusBanner.className = "status-banner status-fail";
+            }
+
+            // Actualizamos gráfico inyectando la línea de Tolerancia (maxDegAllowed)
+            initChart(elapsedTimeArray, globalTempPoints, degPointsArray, maxDegAllowed);
+        }
+
+        // Exportación nativa a PDF usando html2pdf
+        function exportToPDF() {
+            // Ocultamos la caja de Info para el reporte y preparamos la tabla
+            document.querySelector('.info-panel').style.display = 'none';
+            document.querySelector('.table-container').style.maxHeight = 'none';
+            document.querySelector('.table-container').style.overflow = 'visible';
+
+            const element = document.getElementById('mainPanelContent');
+            const opt = {
+                margin:       10,
+                filename:     'Reporte_Cinetica_Degradacion.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Restaurar estilos tras generar
+            html2pdf().set(opt).from(element).save().then(() => {
+                document.querySelector('.info-panel').style.display = 'block';
+                document.querySelector('.table-container').style.maxHeight = '350px';
+                document.querySelector('.table-container').style.overflow = 'auto';
+            });
+        }
+
+        window.onload = function() { initChart(); };
+    </script>
+</body>
+</html>

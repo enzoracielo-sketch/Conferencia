@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEVA Metrología - Centro de Comando 4.0</title>
+    <style>
+        :root {
+            --primary: #660033; 
+            --secondary: #1a252c; 
+            --accent: #3498db; 
+            --text: #f4f6f9;
+            --card-bg: rgba(255, 255, 255, 0.05);
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at top right, #2c3e50, var(--secondary), #0a0a0a);
+            color: var(--text);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        body::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px; z-index: -1;
+        }
+        .header { text-align: center; margin-bottom: 40px; margin-top: 20px; }
+        .logo-text { font-size: 2.5rem; font-weight: 800; letter-spacing: 3px; margin: 0; background: linear-gradient(to right, #ffffff, #bdc3c7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .logo-text span { color: var(--primary); -webkit-text-fill-color: var(--primary); }
+        .subtitle { font-size: 1.2rem; font-weight: 300; color: #bdc3c7; margin-top: 10px; }
+        .tagline { display: inline-block; margin-top: 15px; padding: 6px 20px; background: rgba(52, 152, 219, 0.15); border: 1px solid var(--accent); border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: var(--accent); text-transform: uppercase; }
+        
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; width: 100%; max-width: 1100px; margin-bottom: 80px; }
+        
+        /* Modificado para funcionar como enlace puro y soporte de imagen */
+        .card {
+            background: var(--card-bg); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 25px;
+            cursor: pointer; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); backdrop-filter: blur(10px);
+            position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: flex-start;
+            text-decoration: none; /* Evita que el texto parezca un link azul */
+            background-position: center;
+            background-size: cover; /* Asegura que la imagen de fondo cubra la tarjeta si se usa */
+        }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: var(--primary); transform: scaleX(0); transform-origin: left; transition: transform 0.4s ease; }
+        .card:hover { transform: translateY(-8px); background: rgba(255, 255, 255, 0.08); box-shadow: 0 15px 30px rgba(0,0,0,0.5); border-color: rgba(255, 255, 255, 0.2); }
+        /* Capa oscura superpuesta para asegurar legibilidad si se usa imagen de fondo */
+        .card:hover::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.2); z-index: -1; transition: opacity 0.4s;
+        }
+        .card::before { z-index: 1; }
+        .card:hover::before { transform: scaleX(1); }
+        
+        /* Asegurar que el contenido esté sobre la capa de hover */
+        .card-icon, .card-title, .card-desc { position: relative; z-index: 2; }
+
+        .card-icon { font-size: 2.2rem; margin-bottom: 15px; }
+        .card-title { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px 0; text-transform: uppercase; color: #ffffff; }
+        .card-desc { font-size: 0.9rem; color: #aeb6bf; line-height: 1.5; margin: 0; }
+        
+        .footer { position: fixed; bottom: 0; text-align: center; font-size: 0.85rem; color: #7f8c8d; width: 100%; background: rgba(0,0,0,0.8); padding: 15px 0; backdrop-filter: blur(5px); z-index: 10; border-top: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1 class="logo-text">SEVA<span>.</span>METROLOGÍA</h1>
+        <div class="subtitle">Centro de Comando: Caracterización y Calificación</div>
+        <div class="tagline">Metodología Aprender-Haciendo</div>
+    </div>
+
+    <div class="grid-container">
+        
+        <!-- Enlaces directos a los archivos HTML -->
+        <a href="amef_6.html" class="card">
+            <div class="card-icon">⚙️</div>
+            <h2 class="card-title">AMEF 6</h2>
+            <p class="card-desc">Análisis de Modo y Efecto de Falla integrado para la evaluación técnica de equipos e instalaciones.</p>
+        </a>
+
+        <a href="amef_distribucion.html" class="card">
+            <div class="card-icon">🚚</div>
+            <h2 class="card-title">AMEF Distribución</h2>
+            <p class="card-desc">Evaluación de riesgos enfocada en la cadena de suministro y variables críticas de logística refrigerada.</p>
+        </a>
+
+        <a href="auditoria_cofepris.html" class="card">
+            <div class="card-icon">📋</div>
+            <h2 class="card-title">Auditoría COFEPRIS</h2>
+            <p class="card-desc">Simulador de escenarios de inspección para identificar desvíos críticos bajo la NOM-059 y criterios de la autoridad.</p>
+        </a>
+
+        <!-- NUEVA TARJETA: Simulador DKD -->
+        <a href="dkd.html" class="card">
+            <div class="card-icon">📜</div>
+            <h2 class="card-title">Simulador DKD</h2>
+            <p class="card-desc">Herramienta metrológica para la estimación de incertidumbre de medición y análisis de conformidad según guías DKD.</p>
+        </a>
+
+        <a href="porcentaje_degradacion.html" class="card">
+            <div class="card-icon">📉</div>
+            <h2 class="card-title">% de Degradación</h2>
+            <p class="card-desc">Motor cinético con ecuación de Arrhenius para calcular el impacto real de las excursiones térmicas en el producto.</p>
+        </a>
+
+        <a href="red_fria.html" class="card">
+            <div class="card-icon">🧊</div>
+            <h2 class="card-title">Red Fría</h2>
+            <p class="card-desc">Plataforma integral de mapeo espacial 3D, MKT y dictaminación en tiempo real para almacenes y transporte.</p>
+        </a>
+
+    </div>
+
+    <div class="footer">
+        <strong>Ing. Ricardo Fabián Durán Valencia</strong> | Conferencia Magistral | 27 de mayo, 2026 | Hotel Royal Pedregal
+    </div>
+
+</body>
+</html>

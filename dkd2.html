@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SEVA - DKD-R 5-7 PRO (Totalmente funcional)</title>
+    <!-- Carga de librerías con fallbacks -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; background: #f0f2f5; }
+        .container { display: flex; gap: 20px; flex-wrap: wrap; }
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex: 1; min-width: 280px; }
+        .panel-chart { flex: 2; }
+        button { background: #0a192f; color: white; border: none; padding: 10px 15px; margin: 5px 0; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; transition: 0.2s; }
+        button:hover { opacity: 0.9; transform: scale(0.98); }
+        button.red { background: #c82333; }
+        button.green { background: #28a745; }
+        button.gray { background: #6c757d; }
+        button.test { background: #17a2b8; }
+        input, select { width: 100%; padding: 8px; margin: 5px 0 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .sensor-list { background: #f8f9fa; padding: 8px; border-radius: 5px; max-height: 150px; overflow-y: auto; font-size: 12px; }
+        .sensor-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #ddd; }
+        .remove { color: red; cursor: pointer; font-weight: bold; }
+        #chart { height: 500px; width: 100%; border: 1px solid #ddd; border-radius: 8px; background: white; }
+        .info { background: #e7f3ff; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 14px; }
+        hr { margin: 15px 0; }
+        .status { background: #d4edda; color: #155724; padding: 5px; border-radius: 4px; margin-bottom: 10px; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<h2>🔬 SEVA METROLOGÍA - Caracterización DKD-R 5-7:2025</h2>
+<p><strong>Ing. Fabián Durán Valencia</strong> | Método: Aprender-Haciendo</p>
+<div id="statusBar" class="status">✅ Inicializando...</div>
+
+<div class="container">
+    <div class="panel">
+        <h3>⚙️ Configuración de volumen</h3>
+        <label>Preselección de cámara:</label>
+        <select id="preset">
+            <option value="0.05">Incubadora pequeña (50 L)</option>
+            <option value="0.5">Cámara mediana (500 L)</option>
+            <option value="2.0">Cámara grande (2000 L)</option>
+            <option value="custom">Dimensiones manuales</option>
+        </select>
+
+        <div id="manualDims" style="display:none;">
+            <label>X (m):</label><input type="number" id="mx" value="0.4" step="0.01">
+            <label>Y (m):</label><input type="number" id="my" value="0.35" step="0.01">
+            <label>Z (m):</label><input type="number" id="mz" value="0.35" step="0.01">
+        </div>
+
+        <label>📏 Distancia mínima a paredes (mm):</label>
+        <input type="number" id="wdist" value="50">
+
+        <label>📊 Esquema estándar de sensores:</label>
+        <select id="esquema">
+            <option value="3">3 puntos (solo para <70 L)</option>
+            <option value="9" selected>9 puntos (esquinas + centro)</option>
+            <option value="27">27 puntos (mallado completo)</option>
+            <option value="none">Ninguno (solo sensores manuales)</option>
+        </select>
+
+        <button id="btnAplicarEstandar">🔁 Aplicar esquema estándar</button>
+
+        <hr>
+        <h3>➕ Agregar sensor manual</h3>
+        <div style="display: flex; gap: 5px;">
+            <input type="number" id="mxm" placeholder="X (m)" value="0.2" step="0.01">
+            <input type="number" id="mym" placeholder="Y (m)" value="0.2" step="0.01">
+            <input type="number" id="mzm" placeholder="Z (m)" value="0.2" step="0.01">
+        </div>
+        <button id="btnAgregarManual" class="green">➕ Agregar este sensor</button>
+
+        <div class="sensor-list" id="listaManuales">
+            <div>No hay sensores manuales</div>
+        </div>
+        <button id="btnLimpiarManuales" class="gray">🗑️ Limpiar todos los manuales</button>
+
+        <div class="info" id="infoVolumen">📦 Volumen total: -- L | ✅ Útil: -- L<br>📍 Estándar: -- | ✋ Manuales: --</div>
+        <button id="btnExportarPDF" class="red">📄 Exportar protocolo DKD (PDF)</button>
+        <button id="btnTest" class="test">🧪 Probar JavaScript (debe mostrar alerta)</button>
+    </div>
+
+    <div class="panel panel-chart">
+        <div id="chart"></div>
+        <p style="font-size:12px; text-align:center;">🟡 Sensores estándar | 🔴 Sensores manuales</p>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // Variables globales dentro del alcance
+        let puntosEstandar = [];
+        let puntosManual = [];
+        let plotlyReady = false;
+
+        // ----- Helper para mostrar estado -----
+        function setStatus(msg, isError = false) {
+            const statusDiv = document.getElementById('statusBar');
+            if (statusDiv) {
+                statusDiv.textContent = msg;
+                statusDiv.style.backgroundColor = isError ? '#f8d7da' : '#d4edda';
+                statusDiv.style.color = isError ? '#721c24' : '#155724';
+            }
+        }
+
+        // ----- Esperar a que Plotly esté disponible -----
+        function esperarPlotly(callback) {
+            if (typeof Plotly !== 'undefined') {
+                plotlyReady = true;
+                setStatus('✅ Plotly cargado correctamente.');
+                if (callback) callback();
+            } else {
+                setStatus('⏳ Esperando Plotly... Si esto persiste, revisa tu conexión a Internet.', false);
+                setTimeout(() => esperarPlotly(callback), 500);
+            }
+        }
+
+        // ----- Obtener dimensiones actuales -----
+        function obtenerDims() {
+            let x = parseFloat(document.getElementById('mx').value);
+            let y = parseFloat(document.getElementById('my').value);
+            let z = parseFloat(document.getElementById('mz').value);
+            if (isNaN(x)) x = 0.4;
+            if (isNaN(y)) y = 0.35;
+            if (isNaN(z)) z = 0.35;
+            return { x, y, z };
+        }
+
+        function obtenerDistancia() {
+            let d = parseFloat(document.getElementById('wdist').value) / 1000;
+            return isNaN(d) ? 0.05 : d;
+        }
+
+        // ----- Actualizar tarjeta de información -----
+        function actualizarInfo() {
+            const dim = obtenerDims();
+            const d = obtenerDistancia();
+            const totalL = dim.x * dim.y * dim.z * 1000;
+            const utilL = Math.max(0, (dim.x - 2*d) * (dim.y - 2*d) * (dim.z - 2*d) * 1000);
+            document.getElementById('infoVolumen').innerHTML = `📦 Volumen total: ${totalL.toFixed(1)} L | ✅ Útil: ${utilL.toFixed(1)} L<br>📍 Estándar: ${puntosEstandar.length} | ✋ Manuales: ${puntosManual.length}`;
+        }
+
+        // ----- Generar sensores estándar según esquema -----
+        function generarEstandar() {
+            const dim = obtenerDims();
+            const d = obtenerDistancia();
+            const esquema = document.getElementById('esquema').value;
+            puntosEstandar = [];
+
+            if (esquema === '3') {
+                puntosEstandar.push({ x: d, y: d, z: d });
+                puntosEstandar.push({ x: dim.x/2, y: dim.y/2, z: dim.z/2 });
+                puntosEstandar.push({ x: dim.x - d, y: dim.y - d, z: dim.z - d });
+            } 
+            else if (esquema === '9') {
+                const esquinas = [];
+                [d, dim.x-d].forEach(ix => 
+                    [d, dim.y-d].forEach(iy => 
+                        [d, dim.z-d].forEach(iz => esquinas.push({ x: ix, y: iy, z: iz }))
+                    )
+                );
+                puntosEstandar = [...esquinas, { x: dim.x/2, y: dim.y/2, z: dim.z/2 }];
+            }
+            else if (esquema === '27') {
+                [d, dim.x/2, dim.x-d].forEach(ix => 
+                    [d, dim.y/2, dim.y-d].forEach(iy => 
+                        [d, dim.z/2, dim.z-d].forEach(iz => puntosEstandar.push({ x: ix, y: iy, z: iz }))
+                    )
+                );
+            }
+            actualizarInfo();
+            renderGrafico();
+            setStatus(`✅ Esquema ${esquema === 'none' ? 'vacío' : esquema} aplicado. ${puntosEstandar.length} sensores estándar.`);
+        }
+
+        // ----- Agregar sensor manual -----
+        function agregarSensor() {
+            const dim = obtenerDims();
+            let x = parseFloat(document.getElementById('mxm').value);
+            let y = parseFloat(document.getElementById('mym').value);
+            let z = parseFloat(document.getElementById('mzm').value);
+            if (isNaN(x) || isNaN(y) || isNaN(z)) {
+                alert("Ingrese coordenadas numéricas válidas");
+                return;
+            }
+            if (x < 0 || x > dim.x || y < 0 || y > dim.y || z < 0 || z > dim.z) {
+                alert(`Coordenadas fuera del rango: X (0-${dim.x.toFixed(2)}), Y (0-${dim.y.toFixed(2)}), Z (0-${dim.z.toFixed(2)})`);
+                return;
+            }
+            puntosManual.push({ x, y, z });
+            actualizarListaManual();
+            actualizarInfo();
+            renderGrafico();
+            setStatus(`➕ Sensor manual agregado en (${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)})`);
+        }
+
+        // ----- Eliminar sensor manual por índice -----
+        function eliminarManual(idx) {
+            puntosManual.splice(idx, 1);
+            actualizarListaManual();
+            actualizarInfo();
+            renderGrafico();
+            setStatus(`✖ Sensor manual eliminado. Quedan ${puntosManual.length}.`);
+        }
+
+        // ----- Limpiar todos los manuales -----
+        function limpiarManuales() {
+            puntosManual = [];
+            actualizarListaManual();
+            actualizarInfo();
+            renderGrafico();
+            setStatus(`🗑️ Todos los sensores manuales eliminados.`);
+        }
+
+        // ----- Refrescar lista visual de sensores manuales -----
+        function actualizarListaManual() {
+            const contenedor = document.getElementById('listaManuales');
+            if (!contenedor) return;
+            if (puntosManual.length === 0) {
+                contenedor.innerHTML = '<div>No hay sensores manuales</div>';
+                return;
+            }
+            let html = '';
+            puntosManual.forEach((p, i) => {
+                html += `<div class="sensor-item">
+                            <span>📌 M${i+1}: (${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)}) m</span>
+                            <span class="remove" data-index="${i}">✖ Eliminar</span>
+                        </div>`;
+            });
+            contenedor.innerHTML = html;
+            // Asignar eventos de eliminación a los nuevos botones
+            document.querySelectorAll('#listaManuales .remove').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.getAttribute('data-index'));
+                    if (!isNaN(idx)) eliminarManual(idx);
+                });
+            });
+        }
+
+        // ----- Dibujar gráfico 3D con Plotly -----
+        function renderGrafico() {
+            if (!plotlyReady) {
+                setStatus('⏳ Plotly aún no está listo. El gráfico aparecerá en breve.', false);
+                return;
+            }
+            const dim = obtenerDims();
+            // Vértices del cubo
+            const v = [
+                [0,0,0], [dim.x,0,0], [dim.x,dim.y,0], [0,dim.y,0],
+                [0,0,dim.z], [dim.x,0,dim.z], [dim.x,dim.y,dim.z], [0,dim.y,dim.z]
+            ];
+            const aristas = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+            let xa = [], ya = [], za = [];
+            aristas.forEach(e => {
+                xa.push(v[e[0]][0], v[e[1]][0], null);
+                ya.push(v[e[0]][1], v[e[1]][1], null);
+                za.push(v[e[0]][2], v[e[1]][2], null);
+            });
+            const cubo = {
+                type: 'scatter3d', mode: 'lines',
+                x: xa, y: ya, z: za,
+                line: { color: '#0a192f', width: 4 }, name: 'Cámara'
+            };
+            const traces = [cubo];
+            if (puntosEstandar.length) {
+                traces.push({
+                    x: puntosEstandar.map(p=>p.x), y: puntosEstandar.map(p=>p.y), z: puntosEstandar.map(p=>p.z),
+                    mode: 'markers', type: 'scatter3d',
+                    marker: { size: 6, color: '#ffc107', symbol: 'circle', line: { color: '#856404', width: 1 } },
+                    name: 'Estándar (amarillo)'
+                });
+            }
+            if (puntosManual.length) {
+                traces.push({
+                    x: puntosManual.map(p=>p.x), y: puntosManual.map(p=>p.y), z: puntosManual.map(p=>p.z),
+                    mode: 'markers', type: 'scatter3d',
+                    marker: { size: 8, color: '#dc3545', symbol: 'diamond', line: { color: '#a71d2a', width: 1 } },
+                    name: 'Manuales (rojo)'
+                });
+            }
+            const layout = {
+                scene: {
+                    aspectmode: 'data',
+                    camera: { eye: { x: 1.5, y: 1.5, z: 1.5 } },
+                    xaxis: { title: 'X (m)', range: [0, dim.x] },
+                    yaxis: { title: 'Y (m)', range: [0, dim.y] },
+                    zaxis: { title: 'Z (m)', range: [0, dim.z] }
+                },
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                paper_bgcolor: 'white',
+                legend: { x: 0.02, y: 0.98, bgcolor: 'rgba(255,255,255,0.8)' }
+            };
+            Plotly.newPlot('chart', traces, layout, { preserveDrawingBuffer: true });
+        }
+
+        // ----- Exportar a PDF -----
+        async function exportarPDF() {
+            if (typeof window.jspdf === 'undefined') {
+                alert("La librería jsPDF no se ha cargado. Revisa tu conexión a Internet.");
+                return;
+            }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const btn = document.getElementById('btnExportarPDF');
+            const textoOriginal = btn.innerText;
+            btn.innerText = "📸 Generando PDF, espere...";
+            btn.disabled = true;
+
+            const dim = obtenerDims();
+            const d = obtenerDistancia();
+            const totalL = dim.x * dim.y * dim.z * 1000;
+            const utilL = Math.max(0, (dim.x - 2*d) * (dim.y - 2*d) * (dim.z - 2*d) * 1000);
+            const esquemaSel = document.getElementById('esquema').value;
+            let esquemaTexto = "";
+            if (esquemaSel === '3') esquemaTexto = "3 puntos (bajo volumen)";
+            else if (esquemaSel === '9') esquemaTexto = "9 puntos (esquinas + centro)";
+            else if (esquemaSel === '27') esquemaTexto = "27 puntos (mallado completo)";
+            else esquemaTexto = "Ninguno (solo manuales)";
+
+            let imgData = null;
+            if (plotlyReady) {
+                try {
+                    imgData = await Plotly.toImage('chart', { format: 'png', width: 800, height: 600 });
+                } catch(e) { console.warn("No se pudo capturar gráfico", e); }
+            }
+
+            // Encabezado
+            doc.setFillColor(10, 25, 47);
+            doc.rect(0, 0, 210, 35, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16);
+            doc.text("PROTOCOLO DE CARACTERIZACIÓN DKD-R 5-7:2025", 105, 15, { align: 'center' });
+            doc.setFontSize(10);
+            doc.text("SEVA METROLOGÍA - Cumplimiento normativo", 105, 25, { align: 'center' });
+            doc.setTextColor(0, 0, 0);
+
+            // Tabla de parámetros
+            doc.autoTable({
+                startY: 40,
+                head: [['Parámetro', 'Valor']],
+                body: [
+                    ['Volumen geométrico total', `${totalL.toFixed(1)} litros`],
+                    ['Volumen útil (carga real)', `${utilL.toFixed(1)} litros`],
+                    ['Dimensiones internas (X×Y×Z)', `${dim.x.toFixed(2)} × ${dim.y.toFixed(2)} × ${dim.z.toFixed(2)} m`],
+                    ['Distancia a paredes', `${(d*1000).toFixed(0)} mm`],
+                    ['Esquema estándar aplicado', esquemaTexto],
+                    ['Sensores estándar', `${puntosEstandar.length}`],
+                    ['Sensores manuales agregados', `${puntosManual.length}`],
+                    ['Total de puntos de medición', `${puntosEstandar.length + puntosManual.length}`]
+                ],
+                headStyles: { fillColor: [10, 25, 47], textColor: [255,255,255] },
+                alternateRowStyles: { fillColor: [240,240,240] },
+                margin: { left: 15, right: 15 }
+            });
+            let y = doc.lastAutoTable.finalY + 5;
+
+            // Diagrama 3D
+            if (imgData) {
+                doc.setFontSize(12);
+                doc.setTextColor(10, 25, 47);
+                doc.text("📍 DIAGRAMA DE UBICACIÓN DE SENSORES", 105, y, { align: 'center' });
+                y += 5;
+                doc.addImage(imgData, 'PNG', 15, y, 180, 100);
+                y += 105;
+            } else {
+                doc.text("⚠️ No se pudo generar el diagrama 3D (Plotly no disponible)", 105, y+10, { align: 'center' });
+                y += 20;
+            }
+
+            // Lista de sensores manuales
+            if (puntosManual.length > 0) {
+                const manualTable = puntosManual.map((p, idx) => [`Manual ${idx+1}`, p.x.toFixed(3), p.y.toFixed(3), p.z.toFixed(3)]);
+                doc.autoTable({
+                    startY: y + 5,
+                    head: [['Sensor manual', 'X (m)', 'Y (m)', 'Z (m)']],
+                    body: manualTable,
+                    headStyles: { fillColor: [200, 35, 51], textColor: [255,255,255] },
+                    margin: { left: 15 }
+                });
+                y = doc.lastAutoTable.finalY + 5;
+            }
+
+            // Justificación
+            doc.setFillColor(245, 245, 245);
+            doc.rect(15, y, 180, 38, 'F');
+            doc.setTextColor(200, 35, 51);
+            doc.setFontSize(11);
+            doc.text("📐 JUSTIFICACIÓN TÉCNICA (DKD-R 5-7)", 20, y + 6);
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(9);
+            const justificacion = `Este protocolo cumple con la directriz DKD-R 5-7:2025. La distancia a paredes de ${(d*1000).toFixed(0)} mm define el volumen útil donde se evalúa la homogeneidad. Los sensores manuales permiten caracterizar puntos críticos adicionales. Metrólogo responsable: Ing. Fabián Durán Valencia. Fecha: ${new Date().toLocaleDateString()}.`;
+            doc.text(doc.splitTextToSize(justificacion, 170), 20, y + 13);
+
+            // Pie
+            doc.setFillColor(10, 25, 47);
+            doc.rect(0, 280, 210, 17, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(9);
+            doc.text("SEVA Metrología | Caracterización de cámaras | México 2026", 105, 290, { align: 'center' });
+
+            doc.save("Protocolo_DKD_SEVA.pdf");
+            btn.innerText = textoOriginal;
+            btn.disabled = false;
+            setStatus("✅ PDF exportado correctamente.");
+        }
+
+        // ----- Cambiar entre preset y dimensiones manuales -----
+        function cambiarPreset() {
+            const val = document.getElementById('preset').value;
+            const manualDiv = document.getElementById('manualDims');
+            if (val === 'custom') {
+                manualDiv.style.display = 'block';
+            } else {
+                manualDiv.style.display = 'none';
+                let x = 0.4, y = 0.35, z = 0.35;
+                if (val === '0.5') { x = 0.8; y = 0.8; z = 0.8; }
+                if (val === '2.0') { x = 1.2; y = 1.2; z = 1.4; }
+                document.getElementById('mx').value = x;
+                document.getElementById('my').value = y;
+                document.getElementById('mz').value = z;
+            }
+            generarEstandar();
+        }
+
+        // ----- Inicializar eventos y valores por defecto -----
+        function iniciar() {
+            // Configurar listeners para todos los botones
+            document.getElementById('btnAplicarEstandar').addEventListener('click', generarEstandar);
+            document.getElementById('btnAgregarManual').addEventListener('click', agregarSensor);
+            document.getElementById('btnLimpiarManuales').addEventListener('click', limpiarManuales);
+            document.getElementById('btnExportarPDF').addEventListener('click', exportarPDF);
+            document.getElementById('btnTest').addEventListener('click', () => alert("✅ JavaScript funciona correctamente. Los botones deberían responder."));
+            document.getElementById('preset').addEventListener('change', cambiarPreset);
+            document.getElementById('mx').addEventListener('input', () => generarEstandar());
+            document.getElementById('my').addEventListener('input', () => generarEstandar());
+            document.getElementById('mz').addEventListener('input', () => generarEstandar());
+            document.getElementById('wdist').addEventListener('input', () => generarEstandar());
+            document.getElementById('esquema').addEventListener('change', () => generarEstandar());
+
+            // Cargar valores iniciales
+            cambiarPreset();  // esto ejecuta generarEstandar
+            actualizarListaManual();
+            setStatus("✅ Aplicación lista. Usa los botones.");
+        }
+
+        // Esperar a que Plotly esté listo y luego iniciar
+        esperarPlotly(() => {
+            iniciar();
+        });
+    })();
+</script>
+</body>
+</html>
